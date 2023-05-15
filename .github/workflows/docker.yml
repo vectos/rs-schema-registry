@@ -17,14 +17,6 @@ jobs:
   push_to_registry:
     name: Push Docker image to Docker Hub
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        platform:
-          - linux/amd64
-          - linux/arm/v7
-          - linux/arm/v8
-          - linux/arm64
     steps:
       - name: Check out the repo
         uses: actions/checkout@v3
@@ -52,7 +44,8 @@ jobs:
         with:
           context: .
           file: ./Dockerfile
-          platforms: ${{ matrix.platform }}
+          builder: ${{ steps.builder.outputs.name }}
+          platforms: linux/amd64,linux/arm/v7,linux/arm/v8
           push: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
