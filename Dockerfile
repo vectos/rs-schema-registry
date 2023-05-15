@@ -1,4 +1,4 @@
-FROM rust:1.69.0 as builder
+FROM --platform=$BUILDPLATFORM rust:1.69.0 as builder
 WORKDIR /usr/src/rs-schema-registry
 COPY . .
 RUN cargo install --path .
