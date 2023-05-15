@@ -1,0 +1,17 @@
+version: '3.6'
+services:
+  db:
+    image: mdillon/postgis:11-alpine
+    restart: always
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      start_period: 5s
+      interval: 1s
+      timeout: 5s
+      retries: 30
