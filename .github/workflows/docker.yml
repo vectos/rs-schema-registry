@@ -38,6 +38,7 @@ jobs:
         uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
         with:
           images: markdj/rs-schema-registry
+          tags: type=sha
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
