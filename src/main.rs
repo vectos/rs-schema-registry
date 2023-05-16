@@ -1,12 +1,16 @@
 mod subjects;
+mod schemas;
 
-use axum::{routing::get, Router, Json};
-use axum::extract::State;
+use axum::{routing::*, Router, Json};
+use axum::extract::{Path, State};
+use axum::handler::Handler;
 use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
+use sqlx::PgPool;
 
 use sqlx::postgres::PgPoolOptions;
+use crate::schemas::{FindBySchemaRequest, FindBySchemaResponse, SchemaRepository};
 
-use subjects::PostgresSubjectsRepository;
 use crate::subjects::{Subject, SubjectsRepository};
 
 #[tokio::main]
@@ -20,11 +24,10 @@ async fn main() {
 
     sqlx::migrate!().run(&pool).await.unwrap();
 
-    let subjects_repository = PostgresSubjectsRepository::new(pool.clone());
-
     let app = Router::new()
         .route("/subjects", get(list_subjects))
-        .with_state(subjects_repository);
+        .route("/subjects/:subject", post(check_schema_existence))
+        .with_state(pool);
 
     axum::Server::bind(&"0.0.0.0:8888".parse().unwrap())
         .serve(app.into_make_service())
@@ -32,9 +35,16 @@ async fn main() {
         .unwrap();
 }
 
-pub async fn list_subjects(State(subjects_repo): State<PostgresSubjectsRepository>) -> (StatusCode, Json<Vec<Subject>>) {
+pub async fn list_subjects(State(pool): State<PgPool>) -> (StatusCode, Json<Vec<String>>) {
     let res =
-        subjects_repo.all().await.unwrap();
+        pool.subjects_all().await.unwrap().iter().map(|x| x.name.clone()).collect();
 
     (StatusCode::OK, Json(res))
+}
+
+pub async fn check_schema_existence(State(pool) : State<PgPool>, Path(subject): Path<String>, body: Json<FindBySchemaRequest>) -> Response {
+    match pool.schema_find_by_schema(&subject, &body.schema).await.unwrap() {
+        Some(resp) => (StatusCode::OK, Json(resp)).into_response(),
+        None => (StatusCode::NOT_FOUND).into_response()
+    }
 }

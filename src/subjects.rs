@@ -9,24 +9,12 @@ pub struct Subject {
 
 #[async_trait]
 pub trait SubjectsRepository {
-    async fn all(&self) -> Result<Vec<Subject>, Error>;
-}
-
-#[derive(Clone)]
-pub struct PostgresSubjectsRepository {
-    pool: PgPool
-}
-
-impl PostgresSubjectsRepository {
-    pub fn new(pool: PgPool) -> PostgresSubjectsRepository {
-        PostgresSubjectsRepository { pool }
-    }
+    async fn subjects_all(&self) -> Result<Vec<Subject>, Error>;
 }
 
 #[async_trait]
-impl SubjectsRepository for PostgresSubjectsRepository {
-    async fn all(&self) -> Result<Vec<Subject>, Error> {
-        let res = sqlx::query_as::<_, Subject>("SELECT name FROM subjects").fetch_all(&self.pool).await;
-        res
+impl SubjectsRepository for PgPool {
+    async fn subjects_all(&self) -> Result<Vec<Subject>, Error> {
+        sqlx::query_as::<_, Subject>("SELECT name FROM subjects").fetch_all(self).await
     }
 }
