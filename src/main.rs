@@ -13,12 +13,12 @@ async fn main() {
         .await
         .unwrap();
 
-    // build our application with a single route
+    sqlx::migrate!().run(&pool).await.unwrap();
+
     let app = Router::new()
         .route("/", get(do_math))
         .layer(Extension(pool));
 
-    // run it with hyper on localhost:3000
     axum::Server::bind(&"0.0.0.0:8888".parse().unwrap())
         .serve(app.into_make_service())
         .await
