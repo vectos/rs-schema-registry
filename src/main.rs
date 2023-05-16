@@ -1,8 +1,13 @@
-use axum::{routing::get, Router, Extension, Json};
+mod subjects;
+
+use axum::{routing::get, Router, Json};
+use axum::extract::State;
 use axum::http::StatusCode;
-use sqlx::{PgPool, Row};
 
 use sqlx::postgres::PgPoolOptions;
+
+use subjects::PostgresSubjectsRepository;
+use crate::subjects::{Subject, SubjectsRepository};
 
 #[tokio::main]
 async fn main() {
@@ -15,9 +20,11 @@ async fn main() {
 
     sqlx::migrate!().run(&pool).await.unwrap();
 
+    let subjects_repository = PostgresSubjectsRepository::new(pool.clone());
+
     let app = Router::new()
-        .route("/", get(do_math))
-        .layer(Extension(pool));
+        .route("/subjects", get(list_subjects))
+        .with_state(subjects_repository);
 
     axum::Server::bind(&"0.0.0.0:8888".parse().unwrap())
         .serve(app.into_make_service())
@@ -25,13 +32,9 @@ async fn main() {
         .unwrap();
 }
 
-pub async fn do_math(Extension(pool): Extension<PgPool>) -> (StatusCode, Json<i32>) {
+pub async fn list_subjects(State(subjects_repo): State<PostgresSubjectsRepository>) -> (StatusCode, Json<Vec<Subject>>) {
     let res =
-        sqlx::query(&"SELECT 1+1")
-            .fetch_one(&pool)
-            .await
-            .unwrap()
-            .get(0);
+        subjects_repo.all().await.unwrap();
 
     (StatusCode::OK, Json(res))
 }
