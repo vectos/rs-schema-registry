@@ -1,9 +1,9 @@
-use sqlx::{Error, FromRow, PgPool};
+use sqlx::{FromRow, PgPool};
 use async_trait::async_trait;
-use axum::Json;
+
 use serde::{Deserialize, Serialize};
-use apache_avro::rabin::Rabin;
-use apache_avro::{Schema as AvroSchema, Error as AvroError};
+
+use apache_avro::{Schema as AvroSchema};
 use sha2::Sha256;
 use crate::error::AppError;
 

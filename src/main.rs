@@ -4,16 +4,15 @@ mod error;
 
 use axum::{routing::*, Router, Json};
 use axum::extract::{Path, State};
-use axum::handler::Handler;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use sqlx::PgPool;
 
 use sqlx::postgres::PgPoolOptions;
 use crate::error::AppError;
-use crate::schemas::{FindBySchemaRequest, FindBySchemaResponse, SchemaRepository};
+use crate::schemas::{FindBySchemaRequest, SchemaRepository};
 
-use crate::subjects::{Subject, SubjectsRepository};
+use crate::subjects::{SubjectsRepository};
 
 #[tokio::main]
 async fn main() {
