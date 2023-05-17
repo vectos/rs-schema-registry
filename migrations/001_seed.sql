@@ -14,17 +14,15 @@ CREATE TABLE schemas (
   fingerprint CHARACTER VARYING NOT NULL,
   json TEXT NOT NULL,
   created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL,
-  updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL,
-  fingerprint2 CHARACTER VARYING
+  updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL
 );
 
 CREATE UNIQUE INDEX index_schemas_on_fingerprint ON schemas(fingerprint);
-CREATE UNIQUE INDEX index_schemas_on_fingerprint2 ON schemas(fingerprint2);
 
 CREATE SEQUENCE schema_versions_id_seq;
 CREATE TABLE schema_versions (
   id BIGINT PRIMARY KEY DEFAULT nextval('schema_versions_id_seq'::regclass),
-  version INTEGER DEFAULT 1,
+  version INTEGER DEFAULT 1 NOT NULL,
   subject_id BIGINT NOT NULL references subjects(id),
   schema_id BIGINT NOT NULL references schemas(id)
 );

@@ -3,9 +3,11 @@ use hyper::StatusCode;
 use sqlx::error::{Error as SqlxError};
 use apache_avro::{Error as AvroError};
 
+#[derive(Debug)]
 pub enum AppError {
     DatabaseError(SqlxError),
     AvroError(AvroError),
+    SubjectNotFound(String),
     JsonError
 }
 
@@ -19,9 +21,12 @@ impl From<AvroError> for AppError {
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
+        dbg!(&self);
+
         match self {
             AppError::DatabaseError(_) => (StatusCode::INTERNAL_SERVER_ERROR).into_response(),
             AppError::AvroError(_) => (StatusCode::INTERNAL_SERVER_ERROR).into_response(),
+            AppError::SubjectNotFound(_) => (StatusCode::NOT_FOUND).into_response(),
             AppError::JsonError => (StatusCode::BAD_REQUEST).into_response()
         }
     }

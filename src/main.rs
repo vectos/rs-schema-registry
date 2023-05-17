@@ -1,4 +1,3 @@
-mod subjects;
 mod schemas;
 mod error;
 
@@ -10,9 +9,7 @@ use sqlx::PgPool;
 
 use sqlx::postgres::PgPoolOptions;
 use crate::error::AppError;
-use crate::schemas::{FindBySchemaRequest, SchemaRepository};
-
-use crate::subjects::{SubjectsRepository};
+use crate::schemas::{SchemaRequest, SchemaRepository, RegisterSchemaResponse};
 
 #[tokio::main]
 async fn main() {
@@ -28,6 +25,7 @@ async fn main() {
     let app = Router::new()
         .route("/subjects", get(list_subjects))
         .route("/subjects/:subject", post(check_schema_existence))
+        .route("/subjects/:subject/versions", post(register_schema))
         .with_state(pool);
 
     axum::Server::bind(&"0.0.0.0:8888".parse().unwrap())
@@ -43,7 +41,21 @@ pub async fn list_subjects(State(pool): State<PgPool>) -> Result<Json<Vec<String
     Ok(Json(res))
 }
 
-pub async fn check_schema_existence(State(pool) : State<PgPool>, Path(subject): Path<String>, body: Json<FindBySchemaRequest>) -> Result<Response, AppError> {
+pub async fn register_schema(State(pool): State<PgPool>, Path(subject): Path<String>, body: Json<SchemaRequest>) -> Result<Json<RegisterSchemaResponse>, AppError> {
+    match pool.schema_find_by_schema(&subject, &body.schema).await? {
+        Some(resp) => {
+            let res = RegisterSchemaResponse{ id: resp.id};
+            Ok(Json(res))
+        },
+        None => {
+            let res = pool.schema_insert(&subject, &body.schema).await?;
+            Ok(Json(res))
+        }
+    }
+}
+
+
+pub async fn check_schema_existence(State(pool) : State<PgPool>, Path(subject): Path<String>, body: Json<SchemaRequest>) -> Result<Response, AppError> {
     match pool.schema_find_by_schema(&subject, &body.schema).await? {
         Some(resp) => Ok((StatusCode::OK, Json(resp)).into_response()),
         None => Ok((StatusCode::NOT_FOUND).into_response())
