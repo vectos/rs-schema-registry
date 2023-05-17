@@ -38,7 +38,7 @@ pub struct Subject {
 }
 
 #[async_trait]
-pub trait SchemaRepository {
+pub trait DataStore {
     async fn schema_find_by_schema(&self, subject: &String, schema: &String) -> Result<Option<FindBySchemaResponse>, AppError>;
     async fn schema_insert(&self, subject: &String, schema: &String) -> Result<RegisterSchemaResponse, AppError>;
     async fn subject_versions(&self, subject: &String) -> Result<Vec<i32>, AppError>;
@@ -47,7 +47,7 @@ pub trait SchemaRepository {
 }
 
 #[async_trait]
-impl SchemaRepository for PgPool {
+impl DataStore for PgPool {
     async fn subjects_all(&self) -> Result<Vec<Subject>, AppError> {
         let res = sqlx::query_as::<_, Subject>("SELECT name FROM subjects").fetch_all(self).await?;
         Ok(res)
@@ -81,11 +81,7 @@ impl SchemaRepository for PgPool {
             .execute(self)
             .await?;
 
-        println!("Gone past here!");
-
         tx.commit().await?;
-
-
 
         Ok(RegisterSchemaResponse{id: schema_record.id})
     }

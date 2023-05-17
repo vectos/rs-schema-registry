@@ -9,7 +9,7 @@ use sqlx::PgPool;
 
 use sqlx::postgres::PgPoolOptions;
 use crate::error::AppError;
-use crate::schemas::{SchemaRequest, SchemaRepository, RegisterSchemaResponse};
+use crate::schemas::{SchemaRequest, DataStore, RegisterSchemaResponse};
 
 #[tokio::main]
 async fn main() {
@@ -26,6 +26,7 @@ async fn main() {
         .route("/subjects", get(list_subjects))
         .route("/subjects/:subject", post(check_schema_existence))
         .route("/subjects/:subject/versions", post(register_schema))
+        .route("/subjects/:subject/versions", get(get_subject_versions))
         .with_state(pool);
 
     axum::Server::bind(&"0.0.0.0:8888".parse().unwrap())
@@ -40,6 +41,14 @@ pub async fn list_subjects(State(pool): State<PgPool>) -> Result<Json<Vec<String
 
     Ok(Json(res))
 }
+
+pub async fn get_subject_versions(State(pool): State<PgPool>, Path(subject): Path<String>) -> Result<Json<Vec<i32>>, AppError> {
+    let res =
+        pool.subject_versions(&subject).await?;
+
+    Ok(Json(res))
+}
+
 
 pub async fn register_schema(State(pool): State<PgPool>, Path(subject): Path<String>, body: Json<SchemaRequest>) -> Result<Json<RegisterSchemaResponse>, AppError> {
     match pool.schema_find_by_schema(&subject, &body.schema).await? {
