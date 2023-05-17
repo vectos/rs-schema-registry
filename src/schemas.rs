@@ -39,6 +39,7 @@ pub struct Subject {
 
 #[async_trait]
 pub trait DataStore {
+    async fn schema_find_by_version(&self, subject: &String, version: i32) -> Result<Option<FindBySchemaResponse>, AppError>;
     async fn schema_find_by_schema(&self, subject: &String, schema: &String) -> Result<Option<FindBySchemaResponse>, AppError>;
     async fn schema_insert(&self, subject: &String, schema: &String) -> Result<RegisterSchemaResponse, AppError>;
     async fn subject_versions(&self, subject: &String) -> Result<Vec<i32>, AppError>;
@@ -50,6 +51,14 @@ pub trait DataStore {
 impl DataStore for PgPool {
     async fn subjects_all(&self) -> Result<Vec<Subject>, AppError> {
         let res = sqlx::query_as::<_, Subject>("SELECT name FROM subjects").fetch_all(self).await?;
+        Ok(res)
+    }
+
+    async fn schema_find_by_version(&self, subject: &String, version: i32) -> Result<Option<FindBySchemaResponse>, AppError> {
+        let res = sqlx::query_as!(FindBySchemaResponse, r#"select sub.name as name, sv.version as version, sch.id as id, sch.json as schema from schemas sch inner join schema_versions sv on sch.id = sv.schema_id inner join subjects sub on sv.subject_id = sub.id where sv.version = $1 and sub.name = $2;"#, version, subject)
+            .fetch_optional(self)
+            .await?;
+
         Ok(res)
     }
 
