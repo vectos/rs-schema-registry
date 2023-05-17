@@ -12,8 +12,8 @@ pub struct Schema {
     pub fingerprint: String
 }
 
-#[derive(Deserialize)]
-pub struct SchemaRequest {
+#[derive(FromRow, Deserialize,Serialize)]
+pub struct SchemaPayload {
     pub schema: String
 }
 
@@ -39,6 +39,7 @@ pub struct Subject {
 
 #[async_trait]
 pub trait DataStore {
+    async fn schema_find_by_id(&self, id: i64) -> Result<Option<SchemaPayload>, AppError>;
     async fn schema_find_by_version(&self, subject: &String, version: i32) -> Result<Option<FindBySchemaResponse>, AppError>;
     async fn schema_find_by_schema(&self, subject: &String, schema: &String) -> Result<Option<FindBySchemaResponse>, AppError>;
     async fn schema_insert(&self, subject: &String, schema: &String) -> Result<RegisterSchemaResponse, AppError>;
@@ -49,8 +50,11 @@ pub trait DataStore {
 
 #[async_trait]
 impl DataStore for PgPool {
-    async fn subjects_all(&self) -> Result<Vec<Subject>, AppError> {
-        let res = sqlx::query_as::<_, Subject>("SELECT name FROM subjects").fetch_all(self).await?;
+    async fn schema_find_by_id(&self, id: i64) -> Result<Option<SchemaPayload>, AppError> {
+        let res = sqlx::query_as!(SchemaPayload, r#"select json as schema from schemas where id = $1;"#, id)
+            .fetch_optional(self)
+            .await?;
+
         Ok(res)
     }
 
@@ -108,6 +112,11 @@ impl DataStore for PgPool {
     async fn subject_find(&self, subject: &String) -> Result<Option<Subject>, AppError> {
         let res = sqlx::query_as!(Subject, r#"SELECT id, name FROM subjects WHERE name = $1"#, subject).fetch_optional(self).await?;
 
+        Ok(res)
+    }
+
+    async fn subjects_all(&self) -> Result<Vec<Subject>, AppError> {
+        let res = sqlx::query_as::<_, Subject>("SELECT name FROM subjects").fetch_all(self).await?;
         Ok(res)
     }
 }

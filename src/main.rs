@@ -9,7 +9,7 @@ use sqlx::PgPool;
 
 use sqlx::postgres::PgPoolOptions;
 use crate::error::AppError;
-use crate::schemas::{SchemaRequest, DataStore, RegisterSchemaResponse};
+use crate::schemas::{SchemaPayload, DataStore, RegisterSchemaResponse};
 
 #[tokio::main]
 async fn main() {
@@ -24,6 +24,7 @@ async fn main() {
 
     let app = Router::new()
         .route("/subjects", get(list_subjects))
+        .route("/schemas/ids/:id", get(get_schema_by_id))
         .route("/subjects/:subject", post(check_schema_existence))
         .route("/subjects/:subject/versions", post(register_schema))
         .route("/subjects/:subject/versions", get(get_subject_versions))
@@ -59,6 +60,14 @@ pub async fn get_by_version(State(pool) : State<PgPool>, Path((subject, version)
     }
 }
 
+pub async fn get_schema_by_id(State(pool) : State<PgPool>, Path(id): Path<i64>) -> Result<Response, AppError> {
+    match pool.schema_find_by_id(id).await? {
+        Some(resp) => Ok((StatusCode::OK, Json(resp)).into_response()),
+        None => Ok((StatusCode::NOT_FOUND).into_response())
+    }
+}
+
+
 pub async fn get_schema_by_version(State(pool) : State<PgPool>, Path((subject, version)): Path<(String, i32)>) -> Result<Response, AppError> {
     match pool.schema_find_by_version(&subject, version).await? {
         Some(resp) => Ok((StatusCode::OK, resp.schema).into_response()),
@@ -67,7 +76,7 @@ pub async fn get_schema_by_version(State(pool) : State<PgPool>, Path((subject, v
 }
 
 
-pub async fn register_schema(State(pool): State<PgPool>, Path(subject): Path<String>, body: Json<SchemaRequest>) -> Result<Json<RegisterSchemaResponse>, AppError> {
+pub async fn register_schema(State(pool): State<PgPool>, Path(subject): Path<String>, body: Json<SchemaPayload>) -> Result<Json<RegisterSchemaResponse>, AppError> {
     match pool.schema_find_by_schema(&subject, &body.schema).await? {
         Some(resp) => {
             let res = RegisterSchemaResponse{ id: resp.id};
@@ -81,7 +90,7 @@ pub async fn register_schema(State(pool): State<PgPool>, Path(subject): Path<Str
 }
 
 
-pub async fn check_schema_existence(State(pool) : State<PgPool>, Path(subject): Path<String>, body: Json<SchemaRequest>) -> Result<Response, AppError> {
+pub async fn check_schema_existence(State(pool) : State<PgPool>, Path(subject): Path<String>, body: Json<SchemaPayload>) -> Result<Response, AppError> {
     match pool.schema_find_by_schema(&subject, &body.schema).await? {
         Some(resp) => Ok((StatusCode::OK, Json(resp)).into_response()),
         None => Ok((StatusCode::NOT_FOUND).into_response())
