@@ -27,7 +27,8 @@ async fn main() {
         .route("/subjects/:subject", post(check_schema_existence))
         .route("/subjects/:subject/versions", post(register_schema))
         .route("/subjects/:subject/versions", get(get_subject_versions))
-        .route("/subjects/:subject/versions/:version", get(get_schema_by_version))
+        .route("/subjects/:subject/versions/:version", get(get_by_version))
+        .route("/subjects/:subject/versions/:version/schema", get(get_schema_by_version))
         .with_state(pool);
 
     axum::Server::bind(&"0.0.0.0:8888".parse().unwrap())
@@ -51,12 +52,20 @@ pub async fn get_subject_versions(State(pool): State<PgPool>, Path(subject): Pat
 }
 
 
-pub async fn get_schema_by_version(State(pool) : State<PgPool>, Path((subject, version)): Path<(String, i32)>) -> Result<Response, AppError> {
+pub async fn get_by_version(State(pool) : State<PgPool>, Path((subject, version)): Path<(String, i32)>) -> Result<Response, AppError> {
     match pool.schema_find_by_version(&subject, version).await? {
         Some(resp) => Ok((StatusCode::OK, Json(resp)).into_response()),
         None => Ok((StatusCode::NOT_FOUND).into_response())
     }
 }
+
+pub async fn get_schema_by_version(State(pool) : State<PgPool>, Path((subject, version)): Path<(String, i32)>) -> Result<Response, AppError> {
+    match pool.schema_find_by_version(&subject, version).await? {
+        Some(resp) => Ok((StatusCode::OK, resp.schema).into_response()),
+        None => Ok((StatusCode::NOT_FOUND).into_response())
+    }
+}
+
 
 pub async fn register_schema(State(pool): State<PgPool>, Path(subject): Path<String>, body: Json<SchemaRequest>) -> Result<Json<RegisterSchemaResponse>, AppError> {
     match pool.schema_find_by_schema(&subject, &body.schema).await? {
