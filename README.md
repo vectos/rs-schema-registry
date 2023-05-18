@@ -5,13 +5,15 @@ Run before compiling
 
 ```
 cargo install sqlx-cli
-cargo sqlx migrate run
+cargo sqlx migrate run --database-url postgres://postgres:postgres@localhost:5432/postgres
 ```
 
 
 Test curl commands
 
 ```
-curl -v  -X POST -d '{"schema": "{\"type\": \"string\"}"}' -H "Content-Type: application/json" localhost:8888/subjects/test
-curl -v  -X POST -d '{"schema": "{\"type\": \"string\"}"}' -H "Content-Type: application/json" localhost:8888/subjects/test/versions
+curl -v  -X POST -d '{"schema": "{\"type\":\"record\",\"namespace\":\"Tutorialspoint\",\"name\":\"Employee\",\"fields\":[{\"name\":\"Name\",\"type\":\"string\"},{\"name\":\"Age\",\"type\":\"int\"}]}"}' -H "Content-Type: application/json" localhost:8888/subjects/test
+curl -v  -X POST -d '{"schema": "{\"type\":\"record\",\"namespace\":\"Tutorialspoint\",\"name\":\"Employee\",\"fields\":[{\"name\":\"Name\",\"type\":\"string\"},{\"name\":\"Age\",\"type\":\"int\"}]}"}' -H "Content-Type: application/json" localhost:8888/subjects/test/versions
+curl -v  -X POST -d '{"schema": "{\"type\":\"record\",\"namespace\":\"Tutorialspoint\",\"name\":\"Employee\",\"fields\":[{\"name\":\"Name\",\"type\":\"string\"},{\"name\":\"Age\",\"type\":\"int\"},{\"name\":\"Wage\",\"type\":\"int\"}]}"}' -H "Content-Type: application/json" localhost:8888/subjects/test/versions
+curl -v  -X POST -d '{"schema": "{\"type\":\"record\",\"namespace\":\"Tutorialspoint\",\"name\":\"Employee\",\"fields\":[{\"name\":\"Name\",\"type\":\"string\"},{\"name\":\"Age\",\"type\":\"int\"},{\"name\":\"Wage\",\"default\":1,\"type\":[\"int\", \"null\"]}]}"}' -H "Content-Type: application/json" localhost:8888/subjects/test/versions
 ```

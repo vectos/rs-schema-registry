@@ -40,7 +40,7 @@ async fn main() {
 
 pub async fn list_subjects(State(pool): State<PgPool>) -> Result<Json<Vec<String>>, AppError> {
     let res =
-        pool.subjects_all().await?.iter().map(|x| x.name.clone()).collect();
+        pool.subject_all().await?.iter().map(|x| x.name.clone()).collect();
 
     Ok(Json(res))
 }
