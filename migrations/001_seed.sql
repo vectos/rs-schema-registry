@@ -35,7 +35,7 @@ CREATE TABLE configs (
   compatibility CHARACTER VARYING,
   created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL,
   updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL,
-  subject_id BIGINT NOT NULL references subjects(id)
+  subject_id BIGINT references subjects(id)
 );
 
 CREATE UNIQUE INDEX index_configs_on_subject_id ON configs(subject_id);

@@ -66,6 +66,20 @@ impl Ord for VersionedSchema {
 
 }
 
+impl Compatibility {
+    fn as_str(&self) -> &'static str {
+        match self {
+            Compatibility::Backward => "BACKWARD",
+            Compatibility::BackwardTransitive => "BACKWARD_TRANSITIVE",
+            Compatibility::Forward => "FORWARD",
+            Compatibility::ForwardTransitive => "FORWARD_TRANSITIVE",
+            Compatibility::Full => "FULL",
+            Compatibility::FullTransitive => "FULL_TRANSITIVE",
+            Compatibility::None => "NONE",
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum Compatibility {
@@ -97,7 +111,7 @@ pub trait DataStore {
     async fn subject_schemas(&self, subject: &String) -> Result<Vec<VersionedSchema>, AppError>;
 
     async fn config_get_subject(&self, subject: Option<&String>) -> Result<Option<SchemaCompatibility>, AppError>;
-    async fn config_set_subject(&self, subject: Option<&String>, compatibility: Compatibility) -> Result<(), AppError>;
+    async fn config_set_subject(&self, subject: Option<&String>, compatibility: &Compatibility) -> Result<(), AppError>;
 
 }
 
@@ -256,8 +270,17 @@ impl DataStore for PgPool {
         Ok(res)
     }
 
-    async fn config_set_subject(&self, subject: Option<&String>, compatibility: Compatibility) -> Result<(), AppError> {
-        todo!()
+    async fn config_set_subject(&self, subject: Option<&String>, compatibility: &Compatibility) -> Result<(), AppError> {
+        let subject_id = match subject {
+            Some(sub) => self.subject_find(sub).await?.map(|x| x.id),
+            None => None
+        };
+
+        let _ = sqlx::query!(r#"insert into configs (compatibility, created_at, updated_at, subject_id) values ($1, now(), now(), $2) on conflict (subject_id) do update set updated_at = now(), compatibility = excluded.compatibility"#, Some(compatibility.as_str()), subject_id)
+            .execute(self)
+            .await?;
+
+        Ok(())
     }
 }
 
