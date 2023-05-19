@@ -4,7 +4,7 @@ use async_trait::async_trait;
 
 use serde::{Deserialize, Serialize};
 
-use apache_avro::{Schema as AvroSchema, schema_compatibility::SchemaCompatibility};
+use apache_avro::{Schema as AvroSchema, schema_compatibility::SchemaCompatibility as AvroSchemaCompatibility};
 use sha2::Sha256;
 use crate::error::AppError;
 
@@ -78,6 +78,11 @@ pub enum Compatibility {
     None
 }
 
+#[derive(FromRow, Serialize, Deserialize)]
+pub struct SchemaCompatibility {
+    pub compatibility: Compatibility
+}
+
 #[async_trait]
 pub trait DataStore {
     async fn schema_find_by_id(&self, id: i64) -> Result<Option<SchemaPayload>, AppError>;
@@ -90,6 +95,9 @@ pub trait DataStore {
     async fn subject_find(&self, subject: &String) -> Result<Option<Subject>, AppError>;
     async fn subject_all(&self) -> Result<Vec<Subject>, AppError>;
     async fn subject_schemas(&self, subject: &String) -> Result<Vec<VersionedSchema>, AppError>;
+
+    async fn config_get_subject(&self, subject: &Option<String>) -> Result<Option<SchemaCompatibility>, AppError>;
+    async fn config_set_subject(&self, subject: &Option<String>, compatibility: Compatibility) -> Result<(), AppError>;
 
 }
 
@@ -156,7 +164,7 @@ impl DataStore for PgPool {
                 match schemas.first() {
                     Some(versioned_schema) => {
                         let db_schema = AvroSchema::parse_str(versioned_schema.schema.as_str())?;
-                        Ok(SchemaCompatibility::can_read(&db_schema, &incoming))
+                        Ok(AvroSchemaCompatibility::can_read(&db_schema, &incoming))
                     },
                     None => Ok(true)
                 }
@@ -164,7 +172,7 @@ impl DataStore for PgPool {
             Compatibility::BackwardTransitive => {
                 for s in schemas {
                     let db_schema = AvroSchema::parse_str(s.schema.as_str())?;
-                    if !SchemaCompatibility::can_read(&db_schema, &incoming) {
+                    if !AvroSchemaCompatibility::can_read(&db_schema, &incoming) {
                         return Ok(false)
                     }
                 }
@@ -175,7 +183,7 @@ impl DataStore for PgPool {
                 match schemas.first() {
                     Some(versioned_schema) => {
                         let db_schema = AvroSchema::parse_str(versioned_schema.schema.as_str())?;
-                        Ok(SchemaCompatibility::can_read(&incoming, &db_schema))
+                        Ok(AvroSchemaCompatibility::can_read(&incoming, &db_schema))
                     },
                     None => Ok(true)
                 }
@@ -183,7 +191,7 @@ impl DataStore for PgPool {
             Compatibility::ForwardTransitive => {
                 for s in schemas {
                     let db_schema = AvroSchema::parse_str(s.schema.as_str())?;
-                    if !SchemaCompatibility::can_read(&incoming, &db_schema) {
+                    if !AvroSchemaCompatibility::can_read(&incoming, &db_schema) {
                         return Ok(false)
                     }
                 }
@@ -231,5 +239,37 @@ impl DataStore for PgPool {
             .await?;
 
         Ok(res)
+    }
+
+    async fn config_get_subject(&self, subject: &Option<String>) -> Result<Option<SchemaCompatibility>, AppError> {
+
+        let subject_id = match subject {
+            Some(sub) => self.subject_find(sub).await?.map(|x| x.id),
+            None => None
+        };
+
+        let res = sqlx::query_as!(SchemaCompatibility, r#"select compatibility from configs where subject_id = $1"#, subject_id)
+            .fetch_optional(self)
+            .await?;
+
+        Ok(res)
+    }
+
+    async fn config_set_subject(&self, subject: &Option<String>, compatibility: Compatibility) -> Result<(), AppError> {
+        todo!()
+    }
+}
+
+impl From<Option<String>> for Compatibility {
+    fn from(value: Option<String>) -> Self {
+        match value.as_deref() {
+            Some("BACKWARD") => Compatibility::Backward,
+            Some("BACKWARD_TRANSITIVE") => Compatibility::BackwardTransitive,
+            Some("FORWARD") => Compatibility::Forward,
+            Some("FORWARD_TRANSITIVE") => Compatibility::ForwardTransitive,
+            Some("FULL") => Compatibility::Full,
+            Some("FULL_TRANSITIVE") => Compatibility::FullTransitive,
+            _ => Compatibility::None
+        }
     }
 }
