@@ -67,6 +67,7 @@ impl Ord for VersionedSchema {
 }
 
 impl Compatibility {
+    //TODO: is the right way for sqlx to encode?
     fn as_str(&self) -> &'static str {
         match self {
             Compatibility::Backward => "BACKWARD",
@@ -150,8 +151,14 @@ impl DataStore for PgPool {
 
         let subject_record = self.subject_find(&subject).await?.ok_or(AppError::SubjectNotFound(subject.clone()))?;
         let subject_schemas = self.subject_schemas(&subject).await?;
-        let subject_compatibility = self.config_get_subject(Some(subject)).await?.map(|x| x.compatibility).unwrap_or(Compatibility::Backward);
-        let is_compatible = self.schema_compatibility(&subject_schemas, &avro_schema, subject_compatibility).await?;
+
+        let subject_compatibility = self.config_get_subject(Some(subject)).await?.map(|x| x.compatibility);
+        let global_compatibility = self.config_get_subject(None).await?.map(|x| x.compatibility);
+
+        //TODO: can this or_else be lazy?
+        let compatibility = subject_compatibility.or_else(|| global_compatibility).unwrap_or(Compatibility::Backward);
+
+        let is_compatible = self.schema_compatibility(&subject_schemas, &avro_schema, compatibility).await?;
 
         if !is_compatible {
             return Err(AppError::IncompatibleSchema)
@@ -284,6 +291,7 @@ impl DataStore for PgPool {
     }
 }
 
+//TODO: is the right way for sqlx to decode?
 impl From<Option<String>> for Compatibility {
     fn from(value: Option<String>) -> Self {
         match value.as_deref() {
