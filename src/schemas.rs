@@ -96,8 +96,8 @@ pub trait DataStore {
     async fn subject_all(&self) -> Result<Vec<Subject>, AppError>;
     async fn subject_schemas(&self, subject: &String) -> Result<Vec<VersionedSchema>, AppError>;
 
-    async fn config_get_subject(&self, subject: &Option<String>) -> Result<Option<SchemaCompatibility>, AppError>;
-    async fn config_set_subject(&self, subject: &Option<String>, compatibility: Compatibility) -> Result<(), AppError>;
+    async fn config_get_subject(&self, subject: Option<&String>) -> Result<Option<SchemaCompatibility>, AppError>;
+    async fn config_set_subject(&self, subject: Option<&String>, compatibility: Compatibility) -> Result<(), AppError>;
 
 }
 
@@ -136,7 +136,8 @@ impl DataStore for PgPool {
 
         let subject_record = self.subject_find(&subject).await?.ok_or(AppError::SubjectNotFound(subject.clone()))?;
         let subject_schemas = self.subject_schemas(&subject).await?;
-        let is_compatible = self.schema_compatibility(&subject_schemas, &avro_schema, Compatibility::Backward).await?;
+        let subject_compatibility = self.config_get_subject(Some(subject)).await?.map(|x| x.compatibility).unwrap_or(Compatibility::Backward);
+        let is_compatible = self.schema_compatibility(&subject_schemas, &avro_schema, subject_compatibility).await?;
 
         if !is_compatible {
             return Err(AppError::IncompatibleSchema)
@@ -241,7 +242,7 @@ impl DataStore for PgPool {
         Ok(res)
     }
 
-    async fn config_get_subject(&self, subject: &Option<String>) -> Result<Option<SchemaCompatibility>, AppError> {
+    async fn config_get_subject(&self, subject: Option<&String>) -> Result<Option<SchemaCompatibility>, AppError> {
 
         let subject_id = match subject {
             Some(sub) => self.subject_find(sub).await?.map(|x| x.id),
@@ -255,7 +256,7 @@ impl DataStore for PgPool {
         Ok(res)
     }
 
-    async fn config_set_subject(&self, subject: &Option<String>, compatibility: Compatibility) -> Result<(), AppError> {
+    async fn config_set_subject(&self, subject: Option<&String>, compatibility: Compatibility) -> Result<(), AppError> {
         todo!()
     }
 }

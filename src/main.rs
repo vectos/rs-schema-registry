@@ -31,7 +31,7 @@ async fn main() {
         .route("/subjects/:subject/versions/:version", get(get_by_version))
         .route("/subjects/:subject/versions/:version/schema", get(get_schema_by_version))
         .route("/config", get(get_global_config))
-        .route("/config/:sujbect", get(get_subject_config))
+        .route("/config/:subject", get(get_subject_config))
         .with_state(pool);
 
     axum::Server::bind(&"0.0.0.0:8888".parse().unwrap())
@@ -101,14 +101,14 @@ pub async fn check_schema_existence(State(pool) : State<PgPool>, Path(subject): 
 
 pub async fn get_global_config(State(pool): State<PgPool>) -> Result<Json<SchemaCompatibility>, AppError> {
     let res =
-        pool.config_get_subject(&None).await?.unwrap_or(SchemaCompatibility{ compatibility: Compatibility::Backward });
+        pool.config_get_subject(None).await?.unwrap_or(SchemaCompatibility{ compatibility: Compatibility::Backward });
 
     Ok(Json(res))
 }
 
 pub async fn get_subject_config(State(pool): State<PgPool>, Path(subject): Path<String>) -> Result<Json<SchemaCompatibility>, AppError> {
     let res =
-        pool.config_get_subject(&Some(subject)).await?.unwrap_or(SchemaCompatibility{ compatibility: Compatibility::Backward });
+        pool.config_get_subject(Some(&subject)).await?.unwrap_or(SchemaCompatibility{ compatibility: Compatibility::Backward });
 
     Ok(Json(res))
 }
