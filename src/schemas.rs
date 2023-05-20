@@ -299,14 +299,8 @@ impl DataStore for PgPool {
             .ok_or(AppError::SchemaNotFound(subject.clone(), version))?;
 
         let db_schema = AvroSchema::parse_str(schema_record.schema.as_str())?;
-
-        dbg!(&db_schema);
-        dbg!(&incoming);
-
         let incoming_schema = AvroSchema::parse_str(incoming.as_str())?;
-
-        dbg!(&incoming_schema);
-
+        
         let backward = AvroSchemaCompatibility::can_read(&db_schema, &incoming_schema);
         let forward = AvroSchemaCompatibility::can_read(&incoming_schema, &db_schema);
 

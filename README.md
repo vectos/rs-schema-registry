@@ -39,6 +39,4 @@ curl -X PUT -H "Content-Type: application/json" -d '{"compatibility": "BACKWARD_
 - [ ] DELETE endpoints
 - [ ] Test setup
 - [ ] Segregate service / data layer
-- [ ] Make database url configurable
-- [ ] Make amount of connections configurable
 - [ ] Is the check compatibility also transitive? In other words should we fetch all version X <= version and check for transitive property

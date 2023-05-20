@@ -14,9 +14,12 @@ use crate::schemas::{SchemaPayload, DataStore, RegisterSchemaResponse, SchemaCom
 #[tokio::main]
 async fn main() {
 
+    let database_url = std::env::var("DATABASE_URL").unwrap_or(String::from("postgres://postgres:postgres@localhost:5432/postgres"));
+    let max_connections = std::env::var("DATABASE_CONNECTIONS").map(|x| x.parse::<u32>().unwrap()).unwrap_or(5);
+
     let pool = PgPoolOptions::new()
-        .max_connections(5)
-        .connect("postgres://postgres:postgres@localhost:5432/postgres")
+        .max_connections(max_connections)
+        .connect(&database_url)
         .await
         .unwrap();
 
