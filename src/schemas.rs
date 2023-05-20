@@ -114,6 +114,8 @@ pub trait DataStore {
     async fn config_get_subject(&self, subject: Option<&String>) -> Result<Option<SchemaCompatibility>, AppError>;
     async fn config_set_subject(&self, subject: Option<&String>, compatibility: &Compatibility) -> Result<(), AppError>;
 
+    async fn check_compatibility(&self, subject: &String, version: i32, incoming: &String) -> Result<Compatibility, AppError>;
+
 }
 
 #[async_trait]
@@ -288,6 +290,35 @@ impl DataStore for PgPool {
             .await?;
 
         Ok(())
+    }
+
+    async fn check_compatibility(&self, subject: &String, version: i32, incoming: &String) -> Result<Compatibility, AppError> {
+        let schema_record = self
+            .schema_find_by_version(&subject, version)
+            .await?
+            .ok_or(AppError::SchemaNotFound(subject.clone(), version))?;
+
+        let db_schema = AvroSchema::parse_str(schema_record.schema.as_str())?;
+
+        dbg!(&db_schema);
+        dbg!(&incoming);
+
+        let incoming_schema = AvroSchema::parse_str(incoming.as_str())?;
+
+        dbg!(&incoming_schema);
+
+        let backward = AvroSchemaCompatibility::can_read(&db_schema, &incoming_schema);
+        let forward = AvroSchemaCompatibility::can_read(&incoming_schema, &db_schema);
+
+        if backward && forward {
+            return Ok(Compatibility::Full);
+        } else if backward {
+            return Ok(Compatibility::Backward);
+        } else if forward {
+            return Ok(Compatibility::Forward);
+        }
+
+        return Ok(Compatibility::None)
     }
 }
 

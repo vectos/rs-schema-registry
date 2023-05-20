@@ -26,10 +26,13 @@ async fn main() {
         .route("/subjects", get(list_subjects))
         .route("/schemas/ids/:id", get(get_schema_by_id))
         .route("/subjects/:subject", post(check_schema_existence))
+        //delete subject
         .route("/subjects/:subject/versions", post(register_schema))
         .route("/subjects/:subject/versions", get(get_subject_versions))
         .route("/subjects/:subject/versions/:version", get(get_by_version))
+        //delete version
         .route("/subjects/:subject/versions/:version/schema", get(get_schema_by_version))
+        .route("/compatibility/subjects/:subject/versions/:version", post(check_compatibility))
         .route("/config", put(put_global_config))
         .route("/config", get(get_global_config))
         .route("/config/:subject", get(get_subject_config))
@@ -56,6 +59,11 @@ pub async fn get_subject_versions(State(pool): State<PgPool>, Path(subject): Pat
     Ok(Json(res))
 }
 
+pub async fn check_compatibility(State(pool) : State<PgPool>, Path((subject, version)): Path<(String, i32)>, body: String) -> Result<Json<SchemaCompatibility>, AppError> {
+    let res = pool.check_compatibility(&subject, version, &body).await?;
+
+    Ok(Json(SchemaCompatibility{ compatibility: res }))
+}
 
 pub async fn get_by_version(State(pool) : State<PgPool>, Path((subject, version)): Path<(String, i32)>) -> Result<Response, AppError> {
     match pool.schema_find_by_version(&subject, version).await? {

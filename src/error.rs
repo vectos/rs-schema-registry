@@ -8,6 +8,7 @@ pub enum AppError {
     DatabaseError(SqlxError),
     AvroError(AvroError),
     SubjectNotFound(String),
+    SchemaNotFound(String, i32),
     IncompatibleSchema,
     JsonError
 }
@@ -28,6 +29,7 @@ impl IntoResponse for AppError {
             AppError::DatabaseError(_) => (StatusCode::INTERNAL_SERVER_ERROR).into_response(),
             AppError::AvroError(_) => (StatusCode::INTERNAL_SERVER_ERROR).into_response(),
             AppError::SubjectNotFound(_) => (StatusCode::NOT_FOUND).into_response(),
+            AppError::SchemaNotFound(_, _) => (StatusCode::NOT_FOUND).into_response(),
             AppError::IncompatibleSchema => (StatusCode::CONFLICT).into_response(),
             AppError::JsonError => (StatusCode::BAD_REQUEST).into_response()
         }
