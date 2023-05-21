@@ -62,8 +62,8 @@ pub async fn get_subject_versions(State(pool): State<PgPool>, Path(subject): Pat
     Ok(Json(res))
 }
 
-pub async fn check_compatibility(State(pool) : State<PgPool>, Path((subject, version)): Path<(String, i32)>, body: String) -> Result<Json<SchemaCompatibility>, AppError> {
-    let res = pool.check_compatibility(&subject, version, &body).await?;
+pub async fn check_compatibility(State(pool) : State<PgPool>, Path((subject, version)): Path<(String, i32)>, body: Json<SchemaPayload>) -> Result<Json<SchemaCompatibility>, AppError> {
+    let res = pool.check_compatibility(&subject, version, &body.schema).await?;
 
     Ok(Json(SchemaCompatibility{ compatibility: res }))
 }
