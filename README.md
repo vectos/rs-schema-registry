@@ -40,3 +40,9 @@ curl -X PUT -H "Content-Type: application/json" -d '{"compatibility": "BACKWARD_
 - [ ] Test setup
 - [ ] Segregate service / data layer
 - [ ] Is the check compatibility also transitive? In other words should we fetch all version X <= version and check for transitive property
+- [ ] VersionId = `(-1 | latest)`
+
+## Reference
+
+- [Confluent API](https://docs.confluent.io/platform/current/schema-registry/develop/api.html)
+- 
