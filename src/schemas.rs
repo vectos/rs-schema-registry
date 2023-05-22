@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use std::str::FromStr;
 use sqlx::{FromRow, PgPool};
 use async_trait::async_trait;
 
@@ -43,6 +44,31 @@ pub struct VersionedSchema {
     pub version: i32,
     pub id: i64,
     pub schema: String
+}
+
+#[derive(Deserialize, Clone, Debug)]
+pub enum VersionId {
+    Latest,
+    Version(i32)
+}
+
+impl FromStr for VersionId {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s == "latest" {
+            return Ok(VersionId::Latest)
+        }
+
+        let version = s.parse::<i32>().or(Err(()))?;
+
+        Ok(VersionId::Version(version))
+    }
+}
+
+#[derive(FromRow)]
+pub struct MaxVersion {
+    pub max_version: Option<i32>
 }
 
 impl Eq for VersionedSchema {}
@@ -101,7 +127,7 @@ pub struct SchemaCompatibility {
 #[async_trait]
 pub trait DataStore {
     async fn schema_find_by_id(&self, id: i64) -> Result<Option<SchemaPayload>, AppError>;
-    async fn schema_find_by_version(&self, subject: &String, version: i32) -> Result<Option<FindBySchemaResponse>, AppError>;
+    async fn schema_find_by_version(&self, subject: &String, version: &VersionId) -> Result<Option<FindBySchemaResponse>, AppError>;
     async fn schema_find_by_schema(&self, subject: &String, schema: &String) -> Result<Option<FindBySchemaResponse>, AppError>;
     async fn schema_insert(&self, subject: &String, schema: &String) -> Result<RegisterSchemaResponse, AppError>;
     async fn schema_compatibility(&self, schemas: &Vec<VersionedSchema>, incoming: &AvroSchema, compatibility: Compatibility) -> Result<bool, AppError>;
@@ -114,7 +140,9 @@ pub trait DataStore {
     async fn config_get_subject(&self, subject: Option<&String>) -> Result<Option<SchemaCompatibility>, AppError>;
     async fn config_set_subject(&self, subject: Option<&String>, compatibility: &Compatibility) -> Result<(), AppError>;
 
-    async fn check_compatibility(&self, subject: &String, version: i32, incoming: &String) -> Result<Compatibility, AppError>;
+    async fn version_id(&self, subject: &String, version_id: &VersionId) -> Result<Option<i32>, AppError>;
+
+    async fn check_compatibility(&self, subject: &String, version: &VersionId, incoming: &String) -> Result<Compatibility, AppError>;
 
 }
 
@@ -128,7 +156,22 @@ impl DataStore for PgPool {
         Ok(res)
     }
 
-    async fn schema_find_by_version(&self, subject: &String, version: i32) -> Result<Option<FindBySchemaResponse>, AppError> {
+    async fn version_id(&self, subject: &String, version_id: &VersionId) -> Result<Option<i32>, AppError> {
+        match version_id {
+            VersionId::Latest => {
+                let res: Option<MaxVersion> = sqlx::query_as!(MaxVersion, r#"select max(version) as max_version from schema_versions sv inner join subjects sub on sv.subject_id = sub.id where sub.name = $1;"#, subject)
+                    .fetch_optional(self)
+                    .await?;
+
+                Ok(res.and_then(|x| x.max_version))
+            },
+            VersionId::Version(version) => Ok(Some(*version))
+        }
+    }
+
+    async fn schema_find_by_version(&self, subject: &String, version_id: &VersionId) -> Result<Option<FindBySchemaResponse>, AppError> {
+        let version = self.version_id(&subject, &version_id).await?.ok_or(AppError::SchemaNotFound(subject.clone(), version_id.clone()))?;
+
         let res = sqlx::query_as!(FindBySchemaResponse, r#"select sub.name as name, sv.version as version, sch.id as id, sch.json as schema from schemas sch inner join schema_versions sv on sch.id = sv.schema_id inner join subjects sub on sv.subject_id = sub.id where sv.version = $1 and sub.name = $2;"#, version, subject)
             .fetch_optional(self)
             .await?;
@@ -292,11 +335,11 @@ impl DataStore for PgPool {
         Ok(())
     }
 
-    async fn check_compatibility(&self, subject: &String, version: i32, incoming: &String) -> Result<Compatibility, AppError> {
+    async fn check_compatibility(&self, subject: &String, version_id: &VersionId, incoming: &String) -> Result<Compatibility, AppError> {
         let schema_record = self
-            .schema_find_by_version(&subject, version)
+            .schema_find_by_version(&subject, &version_id)
             .await?
-            .ok_or(AppError::SchemaNotFound(subject.clone(), version))?;
+            .ok_or(AppError::SchemaNotFound(subject.clone(), version_id.clone()))?;
 
         let db_schema = AvroSchema::parse_str(schema_record.schema.as_str())?;
         let incoming_schema = AvroSchema::parse_str(incoming.as_str())?;

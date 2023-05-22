@@ -9,7 +9,7 @@ use sqlx::PgPool;
 
 use sqlx::postgres::PgPoolOptions;
 use crate::error::AppError;
-use crate::schemas::{SchemaPayload, DataStore, RegisterSchemaResponse, SchemaCompatibility, Compatibility};
+use crate::schemas::{SchemaPayload, DataStore, RegisterSchemaResponse, SchemaCompatibility, Compatibility, VersionId};
 
 #[tokio::main]
 async fn main() {
@@ -62,14 +62,16 @@ pub async fn get_subject_versions(State(pool): State<PgPool>, Path(subject): Pat
     Ok(Json(res))
 }
 
-pub async fn check_compatibility(State(pool) : State<PgPool>, Path((subject, version)): Path<(String, i32)>, body: Json<SchemaPayload>) -> Result<Json<SchemaCompatibility>, AppError> {
-    let res = pool.check_compatibility(&subject, version, &body.schema).await?;
+pub async fn check_compatibility(State(pool) : State<PgPool>, Path((subject, version_path_part)): Path<(String, String)>, body: Json<SchemaPayload>) -> Result<Json<SchemaCompatibility>, AppError> {
+    let version_id = version_path_part.parse::<VersionId>().map_err(|_| AppError::InvalidVersion)?;
+    let res = pool.check_compatibility(&subject, &version_id, &body.schema).await?;
 
     Ok(Json(SchemaCompatibility{ compatibility: res }))
 }
 
-pub async fn get_by_version(State(pool) : State<PgPool>, Path((subject, version)): Path<(String, i32)>) -> Result<Response, AppError> {
-    match pool.schema_find_by_version(&subject, version).await? {
+pub async fn get_by_version(State(pool) : State<PgPool>, Path((subject, version_path_part)): Path<(String, String)>) -> Result<Response, AppError> {
+    let version_id = version_path_part.parse::<VersionId>().map_err(|_| AppError::InvalidVersion)?;
+    match pool.schema_find_by_version(&subject, &version_id).await? {
         Some(resp) => Ok((StatusCode::OK, Json(resp)).into_response()),
         None => Ok((StatusCode::NOT_FOUND).into_response())
     }
@@ -83,8 +85,9 @@ pub async fn get_schema_by_id(State(pool) : State<PgPool>, Path(id): Path<i64>) 
 }
 
 
-pub async fn get_schema_by_version(State(pool) : State<PgPool>, Path((subject, version)): Path<(String, i32)>) -> Result<Response, AppError> {
-    match pool.schema_find_by_version(&subject, version).await? {
+pub async fn get_schema_by_version(State(pool) : State<PgPool>, Path((subject, version_path_part)): Path<(String, String)>) -> Result<Response, AppError> {
+    let version_id = version_path_part.parse::<VersionId>().map_err(|_| AppError::InvalidVersion)?;
+    match pool.schema_find_by_version(&subject, &version_id).await? {
         Some(resp) => Ok((StatusCode::OK, resp.schema).into_response()),
         None => Ok((StatusCode::NOT_FOUND).into_response())
     }

@@ -4,14 +4,16 @@ use sqlx::error::{Error as SqlxError};
 use apache_avro::{Error as AvroError};
 use axum::Json;
 use serde::Serialize;
+use crate::schemas::VersionId;
 
 #[derive(Debug)]
 pub enum AppError {
     DatabaseError(SqlxError),
     AvroError(AvroError),
     SubjectNotFound(String),
-    SchemaNotFound(String, i32),
+    SchemaNotFound(String, VersionId),
     IncompatibleSchema,
+    InvalidVersion,
     JsonError
 }
 
@@ -40,6 +42,8 @@ impl IntoResponse for AppError {
                 (StatusCode::NOT_FOUND, Json(ApiError { error_code: 40401, message: String::from("subject was not found") })).into_response(),
             AppError::SchemaNotFound(_, _) =>
                 (StatusCode::NOT_FOUND, Json(ApiError { error_code: 40402, message: String::from("schema was not found") })).into_response(),
+            AppError::InvalidVersion =>
+                (StatusCode::NOT_FOUND, Json(ApiError { error_code: 40402, message: String::from("version not found")})).into_response(),
             AppError::IncompatibleSchema =>
                 (StatusCode::CONFLICT, Json(ApiError { error_code: 409, message: String::from("schema incompatible")})).into_response(),
             AppError::JsonError => (StatusCode::BAD_REQUEST).into_response()
