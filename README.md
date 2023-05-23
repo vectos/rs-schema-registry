@@ -1,6 +1,16 @@
 rs-schema-registry
 ---
 
+The main purpose of Schema Registry is to enforce data compatibility and enable schema evolution in a decoupled manner. When data is produced or consumed by various services, it is important to have a shared understanding of the structure and format of the data. Schema Registry provides a way to define, register, and version schemas, ensuring that all data producers and consumers adhere to the agreed-upon schema.
+
+### Scope
+
+The scope of this project is to explore Rust/Axum/SQLX. Therefore it comes close to the Confluent spec but has limitations like:
+
+- Not all endpoints are implemented
+- It only supports _Avro_
+- It is barely tested, only by hand
+
 ### Run before compiling
 
 ```

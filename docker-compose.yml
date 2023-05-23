@@ -15,3 +15,9 @@ services:
       interval: 1s
       timeout: 5s
       retries: 30
+#  schema-registry:
+#    image: markdj/rs-schema-registry:sha-6eda2e9
+#    ports:
+#      - 8888:8888
+#    environment:
+#      DATABASE_URL: "postgres://postgres:postgres@db:5432/postgres"
