@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "select sv.version as version, sch.id as id, sch.json as schema from schemas sch inner join schema_versions sv on sch.id = sv.schema_id inner join subjects sub on sv.subject_id = sub.id where sub.deleted_at is null and sch.deleted_at is null and sub.name = $1 order by sv.version desc;",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "version",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "schema",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "025c2540a04949955434144bb50beda0ffabc9c712ef565969335a3c516f8ed5"
+}

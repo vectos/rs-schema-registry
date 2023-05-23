@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM schema_versions WHERE subject_id = $1 RETURNING schema_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "schema_id",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "489a060433802a6875dfaad0db6e6f87c7c9b0b63e6c1a22b74254ed3cace6bd"
+}

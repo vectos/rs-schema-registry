@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT version FROM subjects s INNER JOIN schema_versions sv ON s.id = sv.subject_id WHERE s.deleted_at is null and s.name = $1;",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "version",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "8d13ccf90f91d8e6ebe9baf6886cedd33911b41e8d5a1c0f7bac20381b9ed379"
+}
