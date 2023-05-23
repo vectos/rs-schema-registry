@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "select compatibility from configs where subject_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "compatibility",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "ee5b4db19d5145fdbb46f92a4faa24637ef01f5a89bef2013bab58c6f597fc33"
+}

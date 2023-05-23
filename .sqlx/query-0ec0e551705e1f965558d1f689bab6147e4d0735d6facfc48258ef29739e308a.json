@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "select json as schema from schemas where id = $1;",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "schema",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "0ec0e551705e1f965558d1f689bab6147e4d0735d6facfc48258ef29739e308a"
+}

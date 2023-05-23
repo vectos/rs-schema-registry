@@ -16,3 +16,4 @@ serde = "1.0.163"
 apache-avro = "0.14.0"
 sha2 = "0.10.6"
 async-recursion = "1.0.4"
+

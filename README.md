@@ -6,6 +6,7 @@ rs-schema-registry
 ```
 cargo install sqlx-cli
 cargo sqlx migrate run --database-url postgres://postgres:postgres@localhost:5432/postgres
+cargo sqlx prepare  --database-url postgres://postgres:postgres@localhost:5432/postgres
 ```
 
 This will migrate the database before compiling, as the `sqlx::query!` and `sqlx::query_as!` will test the queries _while_ compiling.

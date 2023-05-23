@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "insert into configs (compatibility, created_at, updated_at, subject_id) values ($1, now(), now(), $2) on conflict (subject_id) do update set updated_at = now(), compatibility = excluded.compatibility",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e5228c4e378f1c25b29641e64e4af3f2372ad3a1ae9451eecfa84132c645f7df"
+}

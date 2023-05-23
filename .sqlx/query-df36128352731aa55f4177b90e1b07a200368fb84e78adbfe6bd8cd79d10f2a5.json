@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "select max(version) as max_version from schema_versions sv inner join subjects sub on sv.subject_id = sub.id where sub.name = $1;",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "max_version",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "df36128352731aa55f4177b90e1b07a200368fb84e78adbfe6bd8cd79d10f2a5"
+}
