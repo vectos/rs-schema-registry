@@ -1,196 +1,37 @@
-use std::cmp::Ordering;
-use std::str::FromStr;
-use sqlx::{FromRow, PgPool};
-use async_trait::async_trait;
-
-use serde::{Deserialize, Serialize};
-
 use apache_avro::{Schema as AvroSchema, schema_compatibility::SchemaCompatibility as AvroSchemaCompatibility};
+use async_recursion::async_recursion;
 use sha2::Sha256;
 use crate::error::AppError;
+use crate::data::*;
+use crate::repository::*;
 
-#[derive(FromRow, Serialize)]
-pub struct Schema {
-    pub fingerprint: String
+#[derive(Clone)]
+pub struct Service<R> {
+    pub repository: R
 }
 
-#[derive(FromRow, Deserialize, Serialize)]
-pub struct SchemaPayload {
-    pub schema: String
-}
-
-#[derive(FromRow, Serialize)]
-pub struct FindBySchemaResponse {
-    pub name: String,
-    pub version: i32,
-    pub id: i64,
-    pub schema: String
-}
-
-#[derive(FromRow, Serialize)]
-pub struct RegisterSchemaResponse {
-    pub id: i64
-}
-
-
-#[derive(FromRow, Serialize)]
-pub struct Subject {
-    pub id: i64,
-    pub name: String
-}
-
-#[derive(FromRow)]
-pub struct VersionedSchema {
-    pub version: i32,
-    pub id: i64,
-    pub schema: String
-}
-
-#[derive(Deserialize, Clone, Debug)]
-pub enum VersionId {
-    Latest,
-    Version(i32)
-}
-
-impl FromStr for VersionId {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s == "latest" {
-            return Ok(VersionId::Latest)
-        }
-
-        let version = s.parse::<i32>().or(Err(()))?;
-
-        Ok(VersionId::Version(version))
-    }
-}
-
-#[derive(FromRow)]
-pub struct MaxVersion {
-    pub max_version: Option<i32>
-}
-
-impl Eq for VersionedSchema {}
-
-impl PartialEq for VersionedSchema {
-    fn eq(&self, other: &Self) -> bool {
-        self.id == other.id
-    }
-}
-
-impl PartialOrd for VersionedSchema {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.version.partial_cmp(&other.version)
-    }
-}
-
-impl Ord for VersionedSchema {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.version.cmp(&other.version)
-    }
-
-}
-
-impl Compatibility {
-    //TODO: is the right way for sqlx to encode?
-    fn as_str(&self) -> &'static str {
-        match self {
-            Compatibility::Backward => "BACKWARD",
-            Compatibility::BackwardTransitive => "BACKWARD_TRANSITIVE",
-            Compatibility::Forward => "FORWARD",
-            Compatibility::ForwardTransitive => "FORWARD_TRANSITIVE",
-            Compatibility::Full => "FULL",
-            Compatibility::FullTransitive => "FULL_TRANSITIVE",
-            Compatibility::None => "NONE",
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum Compatibility {
-    Backward,
-    BackwardTransitive,
-    Forward,
-    ForwardTransitive,
-    Full,
-    FullTransitive,
-    None
-}
-
-#[derive(FromRow, Serialize, Deserialize)]
-pub struct SchemaCompatibility {
-    pub compatibility: Compatibility
-}
-
-#[async_trait]
-pub trait DataStore {
-    async fn schema_find_by_id(&self, id: i64) -> Result<Option<SchemaPayload>, AppError>;
-    async fn schema_find_by_version(&self, subject: &String, version: &VersionId) -> Result<Option<FindBySchemaResponse>, AppError>;
-    async fn schema_find_by_schema(&self, subject: &String, schema: &String) -> Result<Option<FindBySchemaResponse>, AppError>;
-    async fn schema_insert(&self, subject: &String, schema: &String) -> Result<RegisterSchemaResponse, AppError>;
-    async fn schema_compatibility(&self, schemas: &Vec<VersionedSchema>, incoming: &AvroSchema, compatibility: Compatibility) -> Result<bool, AppError>;
-
-    async fn subject_versions(&self, subject: &String) -> Result<Vec<i32>, AppError>;
-    async fn subject_find(&self, subject: &String) -> Result<Option<Subject>, AppError>;
-    async fn subject_all(&self) -> Result<Vec<Subject>, AppError>;
-    async fn subject_schemas(&self, subject: &String) -> Result<Vec<VersionedSchema>, AppError>;
-
-    async fn config_get_subject(&self, subject: Option<&String>) -> Result<Option<SchemaCompatibility>, AppError>;
-    async fn config_set_subject(&self, subject: Option<&String>, compatibility: &Compatibility) -> Result<(), AppError>;
-
-    async fn version_id(&self, subject: &String, version_id: &VersionId) -> Result<Option<i32>, AppError>;
-
-    async fn check_compatibility(&self, subject: &String, version: &VersionId, incoming: &String) -> Result<Compatibility, AppError>;
-
-}
-
-#[async_trait]
-impl DataStore for PgPool {
-    async fn schema_find_by_id(&self, id: i64) -> Result<Option<SchemaPayload>, AppError> {
-        let res = sqlx::query_as!(SchemaPayload, r#"select json as schema from schemas where id = $1;"#, id)
-            .fetch_optional(self)
-            .await?;
-
+impl <R : Repository + Send + Sync> Service<R> {
+    pub async fn schema_find_by_id(&self, id: i64) -> Result<Option<SchemaPayload>, AppError> {
+        let res = self.repository.schema_find_by_id(id).await?;
         Ok(res)
     }
 
-    async fn version_id(&self, subject: &String, version_id: &VersionId) -> Result<Option<i32>, AppError> {
-        match version_id {
-            VersionId::Latest => {
-                let res: Option<MaxVersion> = sqlx::query_as!(MaxVersion, r#"select max(version) as max_version from schema_versions sv inner join subjects sub on sv.subject_id = sub.id where sub.name = $1;"#, subject)
-                    .fetch_optional(self)
-                    .await?;
-
-                Ok(res.and_then(|x| x.max_version))
-            },
-            VersionId::Version(version) => Ok(Some(*version))
-        }
-    }
-
-    async fn schema_find_by_version(&self, subject: &String, version_id: &VersionId) -> Result<Option<FindBySchemaResponse>, AppError> {
+    pub async fn schema_find_by_version(&self, subject: &String, version_id: &VersionId) -> Result<Option<FindBySchemaResponse>, AppError> {
         let version = self.version_id(&subject, &version_id).await?.ok_or(AppError::SchemaNotFound(subject.clone(), version_id.clone()))?;
-
-        let res = sqlx::query_as!(FindBySchemaResponse, r#"select sub.name as name, sv.version as version, sch.id as id, sch.json as schema from schemas sch inner join schema_versions sv on sch.id = sv.schema_id inner join subjects sub on sv.subject_id = sub.id where sv.version = $1 and sub.name = $2;"#, version, subject)
-            .fetch_optional(self)
-            .await?;
+        let res = self.repository.schema_find_by_version(&subject, version).await?;
 
         Ok(res)
     }
 
-    async fn schema_find_by_schema(&self, subject: &String, schema: &String) -> Result<Option<FindBySchemaResponse>, AppError> {
+    pub async fn schema_find_by_schema(&self, subject: &String, schema: &String) -> Result<Option<FindBySchemaResponse>, AppError> {
         let avro_schema = AvroSchema::parse_str(schema.as_str())?;
         let fingerprint = avro_schema.fingerprint::<Sha256>().to_string();
-
-        let res = sqlx::query_as!(FindBySchemaResponse, r#"select sub.name as name, sv.version as version, sch.id as id, sch.json as schema from schemas sch inner join schema_versions sv on sch.id = sv.schema_id inner join subjects sub on sv.subject_id = sub.id where sch.fingerprint = $1 and sub.name = $2;"#, fingerprint, subject)
-            .fetch_optional(self)
-            .await?;
+        let res = self.repository.schema_find_by_schema(&subject, &fingerprint).await?;
 
         Ok(res)
     }
 
-    async fn schema_insert(&self, subject: &String, schema: &String) -> Result<RegisterSchemaResponse, AppError> {
+    pub async fn schema_insert(&self, subject: &String, schema: &String) -> Result<RegisterSchemaResponse, AppError> {
         let avro_schema = AvroSchema::parse_str(schema.as_str())?;
         let fingerprint = avro_schema.fingerprint::<Sha256>().to_string();
 
@@ -210,22 +51,13 @@ impl DataStore for PgPool {
         }
 
         let max_version = subject_schemas.first().map(|x| x.version).unwrap_or(0);
-        let tx = self.begin().await?;
+        let schema_id = self.repository.insert(&fingerprint, &schema, subject_record.id, max_version).await?;
 
-        let schema_record = sqlx::query!(r#"INSERT INTO schemas (fingerprint, json, created_at, updated_at) VALUES ($1, $2, now(), now()) returning id;"#, fingerprint, schema)
-            .fetch_one(self)
-            .await?;
-
-        let _ = sqlx::query!(r#"INSERT INTO schema_versions (version, subject_id, schema_id) VALUES ($1, $2, $3)"#, max_version + 1, subject_record.id, schema_record.id)
-            .execute(self)
-            .await?;
-
-        tx.commit().await?;
-
-        Ok(RegisterSchemaResponse{id: schema_record.id})
+        Ok(RegisterSchemaResponse{id: schema_id})
     }
 
-    async fn schema_compatibility(&self, schemas: &Vec<VersionedSchema>, incoming: &AvroSchema, compatibility: Compatibility) -> Result<bool, AppError> {
+    #[async_recursion]
+    pub async fn schema_compatibility(&self, schemas: &Vec<VersionedSchema>, incoming: &AvroSchema, compatibility: Compatibility) -> Result<bool, AppError> {
         match compatibility {
             Compatibility::Backward => {
                 match schemas.first() {
@@ -279,63 +111,59 @@ impl DataStore for PgPool {
         }
     }
 
-    async fn subject_versions(&self, subject: &String) -> Result<Vec<i32>, AppError> {
-        let res = sqlx::query!(r#"SELECT version FROM subjects s INNER JOIN schema_versions sv ON s.id = sv.subject_id WHERE s.name = $1;"#, subject)
-            .fetch_all(self)
-            .await?;
-
-        let transformed = res.iter().map(|x| x.version).collect();
-
-        Ok(transformed)
-    }
-
-    async fn subject_find(&self, subject: &String) -> Result<Option<Subject>, AppError> {
-        let res = sqlx::query_as!(Subject, r#"SELECT id, name FROM subjects WHERE name = $1"#, subject).fetch_optional(self).await?;
-
+    pub async fn subject_versions(&self, subject: &String) -> Result<Vec<i32>, AppError> {
+        let res = self.repository.subject_versions(&subject).await?;
         Ok(res)
     }
 
-    async fn subject_all(&self) -> Result<Vec<Subject>, AppError> {
-        let res = sqlx::query_as::<_, Subject>("SELECT name FROM subjects").fetch_all(self).await?;
+    pub async fn subject_find(&self, subject: &String) -> Result<Option<Subject>, AppError> {
+        let res = self.repository.subject_find(&subject).await?;
         Ok(res)
     }
 
-    async fn subject_schemas(&self, subject: &String) -> Result<Vec<VersionedSchema>, AppError> {
-        let res = sqlx::query_as!(VersionedSchema, r#"select sv.version as version, sch.id as id, sch.json as schema from schemas sch inner join schema_versions sv on sch.id = sv.schema_id inner join subjects sub on sv.subject_id = sub.id where sub.name = $1 order by sv.version desc;"#, subject)
-            .fetch_all(self)
-            .await?;
-
+    pub async fn subject_all(&self) -> Result<Vec<Subject>, AppError> {
+        let res = self.repository.subject_all().await?;
         Ok(res)
     }
 
-    async fn config_get_subject(&self, subject: Option<&String>) -> Result<Option<SchemaCompatibility>, AppError> {
+    pub async fn subject_schemas(&self, subject: &String) -> Result<Vec<VersionedSchema>, AppError> {
+        let res = self.repository.subject_schemas(&subject).await?;
+        Ok(res)
+    }
+
+    pub async fn config_get_subject(&self, subject: Option<&String>) -> Result<Option<SchemaCompatibility>, AppError> {
 
         let subject_id = match subject {
             Some(sub) => self.subject_find(sub).await?.map(|x| x.id),
             None => None
         };
 
-        let res = sqlx::query_as!(SchemaCompatibility, r#"select compatibility from configs where subject_id = $1"#, subject_id)
-            .fetch_optional(self)
-            .await?;
-
+        let res = self.repository.config_get_subject(subject_id).await?;
         Ok(res)
     }
 
-    async fn config_set_subject(&self, subject: Option<&String>, compatibility: &Compatibility) -> Result<(), AppError> {
+    pub async fn config_set_subject(&self, subject: Option<&String>, compatibility: &Compatibility) -> Result<(), AppError> {
         let subject_id = match subject {
             Some(sub) => self.subject_find(sub).await?.map(|x| x.id),
             None => None
         };
 
-        let _ = sqlx::query!(r#"insert into configs (compatibility, created_at, updated_at, subject_id) values ($1, now(), now(), $2) on conflict (subject_id) do update set updated_at = now(), compatibility = excluded.compatibility"#, Some(compatibility.as_str()), subject_id)
-            .execute(self)
-            .await?;
+        let _ = self.repository.config_set_subject(subject_id, &compatibility).await?;
 
         Ok(())
     }
 
-    async fn check_compatibility(&self, subject: &String, version_id: &VersionId, incoming: &String) -> Result<Compatibility, AppError> {
+    pub async fn version_id(&self, subject: &String, version_id: &VersionId) -> Result<Option<i32>, AppError> {
+        match version_id {
+            VersionId::Latest => {
+                let res = self.repository.max_version(&subject).await?;
+                Ok(res.and_then(|x| x.max_version))
+            },
+            VersionId::Version(version) => Ok(Some(*version))
+        }
+    }
+
+    pub async fn check_compatibility(&self, subject: &String, version_id: &VersionId, incoming: &String) -> Result<Compatibility, AppError> {
         let schema_record = self
             .schema_find_by_version(&subject, &version_id)
             .await?
@@ -356,20 +184,5 @@ impl DataStore for PgPool {
         }
 
         return Ok(Compatibility::None)
-    }
-}
-
-//TODO: is the right way for sqlx to decode?
-impl From<Option<String>> for Compatibility {
-    fn from(value: Option<String>) -> Self {
-        match value.as_deref() {
-            Some("BACKWARD") => Compatibility::Backward,
-            Some("BACKWARD_TRANSITIVE") => Compatibility::BackwardTransitive,
-            Some("FORWARD") => Compatibility::Forward,
-            Some("FORWARD_TRANSITIVE") => Compatibility::ForwardTransitive,
-            Some("FULL") => Compatibility::Full,
-            Some("FULL_TRANSITIVE") => Compatibility::FullTransitive,
-            _ => Compatibility::None
-        }
     }
 }

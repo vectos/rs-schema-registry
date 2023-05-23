@@ -4,7 +4,7 @@ use sqlx::error::{Error as SqlxError};
 use apache_avro::{Error as AvroError};
 use axum::Json;
 use serde::Serialize;
-use crate::schemas::VersionId;
+use crate::data::VersionId;
 
 #[derive(Debug)]
 pub enum AppError {

@@ -37,10 +37,7 @@ curl -X PUT -H "Content-Type: application/json" -d '{"compatibility": "BACKWARD_
 ## TODO
 
 - [ ] DELETE endpoints
-- [ ] Test setup
-- [ ] Segregate service / data layer
 
 ## Reference
 
 - [Confluent API](https://docs.confluent.io/platform/current/schema-registry/develop/api.html)
-- 
