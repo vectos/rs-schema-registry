@@ -7,6 +7,7 @@ use crate::data::*;
 pub trait Repository {
     async fn schema_find_by_id(&self, id: i64) -> Result<Option<SchemaPayload>, Error>;
     async fn schema_soft_delete(&self, schema_id: i64) -> Result<u64, Error>;
+    async fn subject_soft_delete(&self, subject_name: &String) -> Result<Vec<i64>, Error>;
     async fn schema_find_by_version(&self, subject: &String, version: i32) -> Result<Option<FindBySchemaResponse>, Error>;
     async fn schema_find_by_schema(&self, subject: &String, fingerprint: &String) -> Result<Option<FindBySchemaResponse>, Error>;
     async fn insert(&self, fingerprint: &String, schema: &String, subject_id: i64, max_version: i32) -> Result<i64, Error>;
@@ -28,11 +29,9 @@ pub struct PgRepository { pub pool: PgPool }
 impl Repository for PgRepository {
 
     async fn schema_find_by_id(&self, id: i64) -> Result<Option<SchemaPayload>, Error> {
-        let res = sqlx::query_as!(SchemaPayload, r#"select json as schema from schemas where id = $1;"#, id)
+        sqlx::query_as!(SchemaPayload, r#"select json as schema from schemas where id = $1;"#, id)
             .fetch_optional(&self.pool)
-            .await?;
-
-        Ok(res)
+            .await
     }
 
     async fn schema_soft_delete(&self, schema_id: i64) -> Result<u64, Error> {
@@ -54,20 +53,42 @@ impl Repository for PgRepository {
         Ok(affected)
     }
 
-    async fn schema_find_by_version(&self, subject: &String, version: i32) -> Result<Option<FindBySchemaResponse>, Error> {
-        let res = sqlx::query_as!(FindBySchemaResponse, r#"select sub.name as name, sv.version as version, sch.id as id, sch.json as schema from schemas sch inner join schema_versions sv on sch.id = sv.schema_id inner join subjects sub on sv.subject_id = sub.id where sch.deleted_at is null and sv.version = $1 and sub.name = $2;"#, version, subject)
+    async fn subject_soft_delete(&self, subject_name: &String) -> Result<Vec<i64>, Error> {
+        let tx = self.pool.begin().await?;
+
+        let subject_record = sqlx::query!(r#"UPDATE subjects SET deleted_at = now() WHERE name = $1 RETURNING id"#, subject_name)
             .fetch_optional(&self.pool)
             .await?;
 
-        Ok(res)
+        let schema_ids = match subject_record {
+            Some(subject) => {
+                let schema_ids = sqlx::query!(r#"DELETE FROM schema_versions WHERE subject_id = $1 RETURNING schema_id"#, subject.id)
+                    .fetch_all(&self.pool)
+                    .await?
+                    .iter()
+                    .map(|x| x.schema_id)
+                    .collect();
+
+                Ok(schema_ids)
+            },
+            None => Ok(vec![])
+        };
+
+        tx.commit().await?;
+
+        schema_ids
+    }
+
+    async fn schema_find_by_version(&self, subject: &String, version: i32) -> Result<Option<FindBySchemaResponse>, Error> {
+        sqlx::query_as!(FindBySchemaResponse, r#"select sub.name as name, sv.version as version, sch.id as id, sch.json as schema from schemas sch inner join schema_versions sv on sch.id = sv.schema_id inner join subjects sub on sv.subject_id = sub.id where sch.deleted_at is null and sv.version = $1 and sub.name = $2;"#, version, subject)
+            .fetch_optional(&self.pool)
+            .await
     }
 
     async fn schema_find_by_schema(&self, subject: &String, fingerprint: &String) -> Result<Option<FindBySchemaResponse>, Error> {
-        let res = sqlx::query_as!(FindBySchemaResponse, r#"select sub.name as name, sv.version as version, sch.id as id, sch.json as schema from schemas sch inner join schema_versions sv on sch.id = sv.schema_id inner join subjects sub on sv.subject_id = sub.id where sch.deleted_at is null and sch.fingerprint = $1 and sub.name = $2;"#, fingerprint, subject)
+        sqlx::query_as!(FindBySchemaResponse, r#"select sub.name as name, sv.version as version, sch.id as id, sch.json as schema from schemas sch inner join schema_versions sv on sch.id = sv.schema_id inner join subjects sub on sv.subject_id = sub.id where sch.deleted_at is null and sch.fingerprint = $1 and sub.name = $2;"#, fingerprint, subject)
             .fetch_optional(&self.pool)
-            .await?;
-
-        Ok(res)
+            .await
     }
 
     async fn insert(&self, fingerprint: &String, schema: &String, subject_id: i64, max_version: i32) -> Result<i64, Error> {
@@ -105,40 +126,36 @@ impl Repository for PgRepository {
     }
 
     async fn subject_find(&self, subject: &String) -> Result<Option<Subject>, Error> {
-        let res = sqlx::query_as!(Subject, r#"SELECT id, name FROM subjects WHERE name = $1"#, subject).fetch_optional(&self.pool).await?;
-        Ok(res)
+        sqlx::query_as!(Subject, r#"SELECT id, name FROM subjects WHERE name = $1"#, subject).fetch_optional(&self.pool).await
     }
 
     async fn subject_all(&self) -> Result<Vec<Subject>, Error> {
-        let res = sqlx::query_as!(Subject, r#"SELECT id, name FROM subjects"#).fetch_all(&self.pool).await?;
-        Ok(res)
+        sqlx::query_as!(Subject, r#"SELECT id, name FROM subjects"#).fetch_all(&self.pool).await
     }
 
     async fn subject_schemas(&self, subject: &String) -> Result<Vec<VersionedSchema>, Error> {
-        let res = sqlx::query_as!(VersionedSchema, r#"select sv.version as version, sch.id as id, sch.json as schema from schemas sch inner join schema_versions sv on sch.id = sv.schema_id inner join subjects sub on sv.subject_id = sub.id where sch.deleted_at is null and sub.name = $1 order by sv.version desc;"#, subject)
+        sqlx::query_as!(VersionedSchema, r#"select sv.version as version, sch.id as id, sch.json as schema from schemas sch inner join schema_versions sv on sch.id = sv.schema_id inner join subjects sub on sv.subject_id = sub.id where sch.deleted_at is null and sub.name = $1 order by sv.version desc;"#, subject)
             .fetch_all(&self.pool)
-            .await?;
-        Ok(res)
+            .await
     }
 
     async fn config_get_subject(&self, subject_id: Option<i64>) -> Result<Option<SchemaCompatibility>, Error> {
-        let res = sqlx::query_as!(SchemaCompatibility, r#"select compatibility from configs where subject_id = $1"#, subject_id)
+        sqlx::query_as!(SchemaCompatibility, r#"select compatibility from configs where subject_id = $1"#, subject_id)
             .fetch_optional(&self.pool)
-            .await?;
-        Ok(res)
+            .await
     }
 
     async fn config_set_subject(&self, subject_id: Option<i64>, compatibility: &Compatibility) -> Result<(), Error> {
         let _ = sqlx::query!(r#"insert into configs (compatibility, created_at, updated_at, subject_id) values ($1, now(), now(), $2) on conflict (subject_id) do update set updated_at = now(), compatibility = excluded.compatibility"#, Some(compatibility.as_str()), subject_id)
             .execute(&self.pool)
             .await?;
+
         Ok(())
     }
     
     async fn max_version(&self, subject: &String) -> Result<Option<MaxVersion>, Error> {
-        let res = sqlx::query_as!(MaxVersion, r#"select max(version) as max_version from schema_versions sv inner join subjects sub on sv.subject_id = sub.id where sub.name = $1;"#, subject)
+        sqlx::query_as!(MaxVersion, r#"select max(version) as max_version from schema_versions sv inner join subjects sub on sv.subject_id = sub.id where sub.name = $1;"#, subject)
             .fetch_optional(&self.pool)
-            .await?;
-        Ok(res)
+            .await
     }
 }

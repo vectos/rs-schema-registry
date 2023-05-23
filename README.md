@@ -36,10 +36,6 @@ curl -X PUT -H "Content-Type: application/json" -d '{"compatibility": "BACKWARD_
 
 ```
 
-### TODO
-
-- [ ] DELETE endpoints
-
 ### Reference
 
 - [Docker hub](https://hub.docker.com/r/markdj/rs-schema-registry/tags)

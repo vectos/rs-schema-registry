@@ -38,6 +38,12 @@ impl <R : Repository + Send + Sync> Service<R> {
         affected
     }
 
+    pub async fn delete_subject(&self, subject: &String) -> Result<Vec<i64>, AppError> {
+        let resp = self.repository.subject_soft_delete(&subject).await?;
+
+        Ok(resp)
+    }
+
     pub async fn schema_find_by_schema(&self, subject: &String, schema: &String) -> Result<Option<FindBySchemaResponse>, AppError> {
         let avro_schema = AvroSchema::parse_str(schema.as_str())?;
         let fingerprint = avro_schema.fingerprint::<Sha256>().to_string();

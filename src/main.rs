@@ -36,12 +36,11 @@ async fn main() {
         .route("/subjects", get(list_subjects))
         .route("/schemas/ids/:id", get(get_schema_by_id))
         .route("/subjects/:subject", post(check_schema_existence))
-        //delete subject
+        .route("/subjects/:subject", delete(delete_subject))
         .route("/subjects/:subject/versions", post(register_schema))
         .route("/subjects/:subject/versions", get(get_subject_versions))
         .route("/subjects/:subject/versions/:version", get(get_by_version))
         .route("/subjects/:subject/versions/:version", delete(delete_by_version))
-        //delete version
         .route("/subjects/:subject/versions/:version/schema", get(get_schema_by_version))
         .route("/compatibility/subjects/:subject/versions/:version", post(check_compatibility))
         .route("/config", put(put_global_config))
@@ -122,6 +121,10 @@ pub async fn register_schema<R : Repository + Send + Sync>(State(pool): State<Se
     }
 }
 
+pub async fn delete_subject<R : Repository + Send + Sync>(State(pool) : State<Service<R>>, Path(subject): Path<String>) -> Result<Response, AppError> {
+    let resp = pool.delete_subject(&subject).await?;
+    Ok((StatusCode::OK, Json(resp)).into_response())
+}
 
 pub async fn check_schema_existence<R : Repository + Send + Sync>(State(pool) : State<Service<R>>, Path(subject): Path<String>, body: Json<SchemaPayload>) -> Result<Response, AppError> {
     match pool.schema_find_by_schema(&subject, &body.schema).await? {

@@ -3,7 +3,7 @@ CREATE TABLE subjects (
   id BIGINT PRIMARY KEY DEFAULT nextval('subjects_id_seq'::regclass),
   name TEXT NOT NULL,
   created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL,
-  updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL
+  deleted_at TIMESTAMP WITHOUT TIME ZONE
 );
 
 CREATE UNIQUE INDEX index_subjects_on_name ON subjects(name);
