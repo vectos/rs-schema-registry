@@ -1,4 +1,4 @@
-mod schemas;
+mod service;
 mod error;
 mod repository;
 mod data;
@@ -13,7 +13,7 @@ use sqlx::postgres::PgPoolOptions;
 use crate::data::*;
 use crate::error::AppError;
 use crate::repository::{Repository, PgRepository};
-use crate::schemas::{Service};
+use crate::service::{Service};
 
 #[tokio::main]
 async fn main() {
@@ -30,7 +30,7 @@ async fn main() {
     let repository: PgRepository = PgRepository { pool };
     let service: Service<PgRepository> = Service { repository };
 
-    // sqlx::migrate!().run(&repository.pool).await.unwrap();
+    // sqlx::migrate!().run(pool.clone()).await.unwrap();
 
     let app = Router::new()
         .route("/subjects", get(list_subjects))
@@ -137,15 +137,13 @@ pub async fn get_subject_config<R : Repository + Send + Sync>(State(pool): State
 }
 
 pub async fn put_subject_config<R : Repository + Send + Sync>(State(pool): State<Service<R>>, Path(subject): Path<String>, body: Json<SchemaCompatibility>) -> Result<Json<SchemaCompatibility>, AppError> {
-    let _ =
-        pool.config_set_subject(Some(&subject), &body.compatibility).await?;
+    pool.config_set_subject(Some(&subject), &body.compatibility).await?;
 
     Ok(body)
 }
 
 pub async fn put_global_config<R : Repository + Send + Sync>(State(pool): State<Service<R>>, body: Json<SchemaCompatibility>) -> Result<Json<SchemaCompatibility>, AppError> {
-    let _ =
-        pool.config_set_subject(None, &body.compatibility).await?;
+    pool.config_set_subject(None, &body.compatibility).await?;
 
     Ok(body)
 }
