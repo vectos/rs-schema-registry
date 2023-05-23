@@ -55,106 +55,106 @@ async fn main() {
         .unwrap();
 }
 
-pub async fn list_subjects<R : Repository + Send + Sync>(State(pool): State<Service<R>>) -> Result<Json<Vec<String>>, AppError> {
+pub async fn list_subjects<R : Repository + Send + Sync>(State(svc): State<Service<R>>) -> Result<Json<Vec<String>>, AppError> {
     let res =
-        pool.subject_all().await?.iter().map(|x| x.name.clone()).collect();
+        svc.subject_all().await?.iter().map(|x| x.name.clone()).collect();
 
     Ok(Json(res))
 }
 
-pub async fn get_subject_versions<R : Repository + Send + Sync>(State(pool): State<Service<R>>, Path(subject): Path<String>) -> Result<Json<Vec<i32>>, AppError> {
+pub async fn get_subject_versions<R : Repository + Send + Sync>(State(svc): State<Service<R>>, Path(subject): Path<String>) -> Result<Json<Vec<i32>>, AppError> {
     let res =
-        pool.subject_versions(&subject).await?;
+        svc.subject_versions(&subject).await?;
 
     Ok(Json(res))
 }
 
-pub async fn check_compatibility<R : Repository + Send + Sync>(State(pool) : State<Service<R>>, Path((subject, version_path_part)): Path<(String, String)>, body: Json<SchemaPayload>) -> Result<Json<SchemaCompatibility>, AppError> {
+pub async fn check_compatibility<R : Repository + Send + Sync>(State(svc) : State<Service<R>>, Path((subject, version_path_part)): Path<(String, String)>, body: Json<SchemaPayload>) -> Result<Json<SchemaCompatibility>, AppError> {
     let version_id = version_path_part.parse::<VersionId>().map_err(|_| AppError::InvalidVersion)?;
-    let res = pool.check_compatibility(&subject, &version_id, &body.schema).await?;
+    let res = svc.check_compatibility(&subject, &version_id, &body.schema).await?;
 
     Ok(Json(SchemaCompatibility{ compatibility: res }))
 }
 
-pub async fn get_by_version<R : Repository + Send + Sync>(State(pool) : State<Service<R>>, Path((subject, version_path_part)): Path<(String, String)>) -> Result<Response, AppError> {
+pub async fn get_by_version<R : Repository + Send + Sync>(State(svc) : State<Service<R>>, Path((subject, version_path_part)): Path<(String, String)>) -> Result<Response, AppError> {
     let version_id = version_path_part.parse::<VersionId>().map_err(|_| AppError::InvalidVersion)?;
-    match pool.schema_find_by_version(&subject, &version_id).await? {
+    match svc.schema_find_by_version(&subject, &version_id).await? {
         Some(resp) => Ok((StatusCode::OK, Json(resp)).into_response()),
         None => Ok((StatusCode::NOT_FOUND).into_response())
     }
 }
 
-pub async fn delete_by_version<R : Repository + Send + Sync>(State(pool) : State<Service<R>>, Path((subject, version_path_part)): Path<(String, String)>) -> Result<Response, AppError> {
+pub async fn delete_by_version<R : Repository + Send + Sync>(State(svc) : State<Service<R>>, Path((subject, version_path_part)): Path<(String, String)>) -> Result<Response, AppError> {
     let version_id = version_path_part.parse::<VersionId>().map_err(|_| AppError::InvalidVersion)?;
-    let res = pool.schema_delete_by_version(&subject, &version_id).await?;
+    let res = svc.schema_delete_by_version(&subject, &version_id).await?;
 
     Ok((StatusCode::OK, Json(res)).into_response())
 }
 
-pub async fn get_schema_by_id<R : Repository + Send + Sync>(State(pool) : State<Service<R>>, Path(id): Path<i64>) -> Result<Response, AppError> {
-    match pool.schema_find_by_id(id).await? {
+pub async fn get_schema_by_id<R : Repository + Send + Sync>(State(svc) : State<Service<R>>, Path(id): Path<i64>) -> Result<Response, AppError> {
+    match svc.schema_find_by_id(id).await? {
         Some(resp) => Ok((StatusCode::OK, Json(resp)).into_response()),
         None => Ok((StatusCode::NOT_FOUND).into_response())
     }
 }
 
 
-pub async fn get_schema_by_version<R : Repository + Send + Sync>(State(pool) : State<Service<R>>, Path((subject, version_path_part)): Path<(String, String)>) -> Result<Response, AppError> {
+pub async fn get_schema_by_version<R : Repository + Send + Sync>(State(svc) : State<Service<R>>, Path((subject, version_path_part)): Path<(String, String)>) -> Result<Response, AppError> {
     let version_id = version_path_part.parse::<VersionId>().map_err(|_| AppError::InvalidVersion)?;
-    match pool.schema_find_by_version(&subject, &version_id).await? {
+    match svc.schema_find_by_version(&subject, &version_id).await? {
         Some(resp) => Ok((StatusCode::OK, resp.schema).into_response()),
         None => Ok((StatusCode::NOT_FOUND).into_response())
     }
 }
 
 
-pub async fn register_schema<R : Repository + Send + Sync>(State(pool): State<Service<R>>, Path(subject): Path<String>, body: Json<SchemaPayload>) -> Result<Json<RegisterSchemaResponse>, AppError> {
-    match pool.schema_find_by_schema(&subject, &body.schema).await? {
+pub async fn register_schema<R : Repository + Send + Sync>(State(svc): State<Service<R>>, Path(subject): Path<String>, body: Json<SchemaPayload>) -> Result<Json<RegisterSchemaResponse>, AppError> {
+    match svc.schema_find_by_schema(&subject, &body.schema).await? {
         Some(resp) => {
             let res = RegisterSchemaResponse{ id: resp.id};
             Ok(Json(res))
         },
         None => {
-            let res = pool.schema_insert(&subject, &body.schema).await?;
+            let res = svc.schema_insert(&subject, &body.schema).await?;
             Ok(Json(res))
         }
     }
 }
 
-pub async fn delete_subject<R : Repository + Send + Sync>(State(pool) : State<Service<R>>, Path(subject): Path<String>) -> Result<Response, AppError> {
-    let resp = pool.delete_subject(&subject).await?;
+pub async fn delete_subject<R : Repository + Send + Sync>(State(svc) : State<Service<R>>, Path(subject): Path<String>) -> Result<Response, AppError> {
+    let resp = svc.delete_subject(&subject).await?;
     Ok((StatusCode::OK, Json(resp)).into_response())
 }
 
-pub async fn check_schema_existence<R : Repository + Send + Sync>(State(pool) : State<Service<R>>, Path(subject): Path<String>, body: Json<SchemaPayload>) -> Result<Response, AppError> {
-    match pool.schema_find_by_schema(&subject, &body.schema).await? {
+pub async fn check_schema_existence<R : Repository + Send + Sync>(State(svc) : State<Service<R>>, Path(subject): Path<String>, body: Json<SchemaPayload>) -> Result<Response, AppError> {
+    match svc.schema_find_by_schema(&subject, &body.schema).await? {
         Some(resp) => Ok((StatusCode::OK, Json(resp)).into_response()),
         None => Ok((StatusCode::NOT_FOUND).into_response())
     }
 }
 
-pub async fn get_global_config<R : Repository + Send + Sync>(State(pool): State<Service<R>>) -> Result<Json<SchemaCompatibility>, AppError> {
+pub async fn get_global_config<R : Repository + Send + Sync>(State(svc): State<Service<R>>) -> Result<Json<SchemaCompatibility>, AppError> {
     let res =
-        pool.config_get_subject(None).await?.unwrap_or(SchemaCompatibility{ compatibility: Compatibility::Backward });
+        svc.config_get_subject(None).await?.unwrap_or(SchemaCompatibility{ compatibility: Compatibility::Backward });
 
     Ok(Json(res))
 }
 
-pub async fn get_subject_config<R : Repository + Send + Sync>(State(pool): State<Service<R>>, Path(subject): Path<String>) -> Result<Json<SchemaCompatibility>, AppError> {
+pub async fn get_subject_config<R : Repository + Send + Sync>(State(svc): State<Service<R>>, Path(subject): Path<String>) -> Result<Json<SchemaCompatibility>, AppError> {
     let res =
-        pool.config_get_subject(Some(&subject)).await?.unwrap_or(SchemaCompatibility{ compatibility: Compatibility::Backward });
+        svc.config_get_subject(Some(&subject)).await?.unwrap_or(SchemaCompatibility{ compatibility: Compatibility::Backward });
 
     Ok(Json(res))
 }
 
-pub async fn put_subject_config<R : Repository + Send + Sync>(State(pool): State<Service<R>>, Path(subject): Path<String>, body: Json<SchemaCompatibility>) -> Result<Json<SchemaCompatibility>, AppError> {
-    pool.config_set_subject(Some(&subject), &body.compatibility).await?;
+pub async fn put_subject_config<R : Repository + Send + Sync>(State(svc): State<Service<R>>, Path(subject): Path<String>, body: Json<SchemaCompatibility>) -> Result<Json<SchemaCompatibility>, AppError> {
+    svc.config_set_subject(Some(&subject), &body.compatibility).await?;
 
     Ok(body)
 }
 
-pub async fn put_global_config<R : Repository + Send + Sync>(State(pool): State<Service<R>>, body: Json<SchemaCompatibility>) -> Result<Json<SchemaCompatibility>, AppError> {
-    pool.config_set_subject(None, &body.compatibility).await?;
+pub async fn put_global_config<R : Repository + Send + Sync>(State(svc): State<Service<R>>, body: Json<SchemaCompatibility>) -> Result<Json<SchemaCompatibility>, AppError> {
+    svc.config_set_subject(None, &body.compatibility).await?;
 
     Ok(body)
 }
