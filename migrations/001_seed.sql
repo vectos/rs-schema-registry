@@ -14,7 +14,7 @@ CREATE TABLE schemas (
   fingerprint CHARACTER VARYING NOT NULL,
   json TEXT NOT NULL,
   created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL,
-  updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL
+  deleted_at TIMESTAMP WITHOUT TIME ZONE
 );
 
 CREATE UNIQUE INDEX index_schemas_on_fingerprint ON schemas(fingerprint);

@@ -6,6 +6,7 @@ use crate::data::*;
 #[async_trait]
 pub trait Repository {
     async fn schema_find_by_id(&self, id: i64) -> Result<Option<SchemaPayload>, Error>;
+    async fn schema_sof_delete(&self, schema_id: i64) -> Result<u64, Error>;
     async fn schema_find_by_version(&self, subject: &String, version: i32) -> Result<Option<FindBySchemaResponse>, Error>;
     async fn schema_find_by_schema(&self, subject: &String, fingerprint: &String) -> Result<Option<FindBySchemaResponse>, Error>;
     async fn insert(&self, fingerprint: &String, schema: &String, subject_id: i64, max_version: i32) -> Result<i64, Error>;
@@ -34,8 +35,17 @@ impl Repository for PgRepository {
         Ok(res)
     }
 
+    async fn schema_sof_delete(&self, schema_id: i64) -> Result<u64, Error> {
+        let res = sqlx::query!(r#"UPDATE schemas SET deleted_at = now() WHERE id = $1"#, schema_id)
+            .execute(&self.pool)
+            .await?
+            .rows_affected();
+
+        Ok(res)
+    }
+
     async fn schema_find_by_version(&self, subject: &String, version: i32) -> Result<Option<FindBySchemaResponse>, Error> {
-        let res = sqlx::query_as!(FindBySchemaResponse, r#"select sub.name as name, sv.version as version, sch.id as id, sch.json as schema from schemas sch inner join schema_versions sv on sch.id = sv.schema_id inner join subjects sub on sv.subject_id = sub.id where sv.version = $1 and sub.name = $2;"#, version, subject)
+        let res = sqlx::query_as!(FindBySchemaResponse, r#"select sub.name as name, sv.version as version, sch.id as id, sch.json as schema from schemas sch inner join schema_versions sv on sch.id = sv.schema_id inner join subjects sub on sv.subject_id = sub.id where sch.deleted_at is null and sv.version = $1 and sub.name = $2;"#, version, subject)
             .fetch_optional(&self.pool)
             .await?;
 
@@ -43,7 +53,7 @@ impl Repository for PgRepository {
     }
 
     async fn schema_find_by_schema(&self, subject: &String, fingerprint: &String) -> Result<Option<FindBySchemaResponse>, Error> {
-        let res = sqlx::query_as!(FindBySchemaResponse, r#"select sub.name as name, sv.version as version, sch.id as id, sch.json as schema from schemas sch inner join schema_versions sv on sch.id = sv.schema_id inner join subjects sub on sv.subject_id = sub.id where sch.fingerprint = $1 and sub.name = $2;"#, fingerprint, subject)
+        let res = sqlx::query_as!(FindBySchemaResponse, r#"select sub.name as name, sv.version as version, sch.id as id, sch.json as schema from schemas sch inner join schema_versions sv on sch.id = sv.schema_id inner join subjects sub on sv.subject_id = sub.id where sch.deleted_at is null and sch.fingerprint = $1 and sub.name = $2;"#, fingerprint, subject)
             .fetch_optional(&self.pool)
             .await?;
 
@@ -62,7 +72,7 @@ impl Repository for PgRepository {
     }
 
     async fn insert_schema(&self, fingerprint: &String, schema: &String) -> Result<i64, Error> {
-        let res = sqlx::query!(r#"INSERT INTO schemas (fingerprint, json, created_at, updated_at) VALUES ($1, $2, now(), now()) returning id;"#, fingerprint, schema)
+        let res = sqlx::query!(r#"INSERT INTO schemas (fingerprint, json, created_at) VALUES ($1, $2, now()) returning id;"#, fingerprint, schema)
             .fetch_one(&self.pool)
             .await?;
 
@@ -95,7 +105,7 @@ impl Repository for PgRepository {
     }
 
     async fn subject_schemas(&self, subject: &String) -> Result<Vec<VersionedSchema>, Error> {
-        let res = sqlx::query_as!(VersionedSchema, r#"select sv.version as version, sch.id as id, sch.json as schema from schemas sch inner join schema_versions sv on sch.id = sv.schema_id inner join subjects sub on sv.subject_id = sub.id where sub.name = $1 order by sv.version desc;"#, subject)
+        let res = sqlx::query_as!(VersionedSchema, r#"select sv.version as version, sch.id as id, sch.json as schema from schemas sch inner join schema_versions sv on sch.id = sv.schema_id inner join subjects sub on sv.subject_id = sub.id where sch.deleted_at is null and sub.name = $1 order by sv.version desc;"#, subject)
             .fetch_all(&self.pool)
             .await?;
         Ok(res)

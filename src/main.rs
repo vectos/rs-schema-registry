@@ -40,6 +40,7 @@ async fn main() {
         .route("/subjects/:subject/versions", post(register_schema))
         .route("/subjects/:subject/versions", get(get_subject_versions))
         .route("/subjects/:subject/versions/:version", get(get_by_version))
+        .route("/subjects/:subject/versions/:version", delete(delete_by_version))
         //delete version
         .route("/subjects/:subject/versions/:version/schema", get(get_schema_by_version))
         .route("/compatibility/subjects/:subject/versions/:version", post(check_compatibility))
@@ -82,6 +83,13 @@ pub async fn get_by_version<R : Repository + Send + Sync>(State(pool) : State<Se
         Some(resp) => Ok((StatusCode::OK, Json(resp)).into_response()),
         None => Ok((StatusCode::NOT_FOUND).into_response())
     }
+}
+
+pub async fn delete_by_version<R : Repository + Send + Sync>(State(pool) : State<Service<R>>, Path((subject, version_path_part)): Path<(String, String)>) -> Result<Response, AppError> {
+    let version_id = version_path_part.parse::<VersionId>().map_err(|_| AppError::InvalidVersion)?;
+    let res = pool.schema_delete_by_version(&subject, &version_id).await?;
+
+    Ok((StatusCode::OK, Json(res)).into_response())
 }
 
 pub async fn get_schema_by_id<R : Repository + Send + Sync>(State(pool) : State<Service<R>>, Path(id): Path<i64>) -> Result<Response, AppError> {

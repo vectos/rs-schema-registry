@@ -23,6 +23,21 @@ impl <R : Repository + Send + Sync> Service<R> {
         Ok(res)
     }
 
+    pub async fn schema_delete_by_version(&self, subject: &String, version_id: &VersionId) -> Result<u64, AppError> {
+        let version = self.version_id(&subject, &version_id).await?.ok_or(AppError::SchemaNotFound(subject.clone(), version_id.clone()))?;
+        let res = self.repository.schema_find_by_version(&subject, version).await?;
+
+        let affected: Result<u64, AppError> = match res {
+            Some(resp) => {
+                let res= self.repository.schema_sof_delete(resp.id).await?;
+                Ok(res)
+            },
+            None => Ok(0)
+        };
+
+        affected
+    }
+
     pub async fn schema_find_by_schema(&self, subject: &String, schema: &String) -> Result<Option<FindBySchemaResponse>, AppError> {
         let avro_schema = AvroSchema::parse_str(schema.as_str())?;
         let fingerprint = avro_schema.fingerprint::<Sha256>().to_string();
