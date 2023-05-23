@@ -1,15 +1,16 @@
 rs-schema-registry
 ---
 
-Run before compiling
+### Run before compiling
 
 ```
 cargo install sqlx-cli
 cargo sqlx migrate run --database-url postgres://postgres:postgres@localhost:5432/postgres
 ```
 
+This will migrate the database before compiling, as the `sqlx::query!` and `sqlx::query_as!` will test the queries _while_ compiling.
 
-Test curl commands
+### Test curl commands
 
 ```
 curl -v  -X POST -d '{"schema": "{\"type\":\"record\",\"namespace\":\"Tutorialspoint\",\"name\":\"Employee\",\"fields\":[{\"name\":\"Name\",\"type\":\"string\"},{\"name\":\"Age\",\"type\":\"int\"}]}"}' -H "Content-Type: application/json" localhost:8888/subjects/test
@@ -24,7 +25,7 @@ curl -v  -X POST -d '{"schema": "{\"type\":\"record\",\"namespace\":\"Tutorialsp
 curl -v  -X POST -d '{"schema": "{\"type\":\"record\",\"namespace\":\"Tutorialspoint\",\"name\":\"Employee\",\"fields\":[{\"name\":\"Name\",\"type\":\"string\"},{\"name\":\"Age\",\"type\":\"int\"},{\"name\":\"Wage\",\"default\":1,\"type\":[\"int\", \"null\"]}]}"}' -H "Content-Type: application/json" localhost:8888/subjects/test/versions
 
 -- check compatibility
-curl -v  -X POST -d '{"type":"record","namespace":"Tutorialspoint","name":"Employee","fields":[{"name":"Name","type":"string"},{"name":"Age","type":"int"},{"name":"Wage","type":"int"}]}' -H "Content-Type: application/json" localhost:8888/compatibility/subjects/test/versions/1
+curl -v  -X POST -d '{"schema": "{\"type\":\"record\",\"namespace\":\"Tutorialspoint\",\"name\":\"Employee\",\"fields\":[{\"name\":\"Name\",\"type\":\"string\"},{\"name\":\"Age\",\"type\":\"int\"},{\"name\":\"Wage\",\"default\":1,\"type\":\"int\"}]}"}' -H "Content-Type: application/json" localhost:8888/compatibility/subjects/test/versions/1
 
 -- set compatibility globally
 curl -X PUT -H "Content-Type: application/json" -d '{"compatibility": "BACKWARD"}' http://localhost:8888/config
@@ -34,10 +35,10 @@ curl -X PUT -H "Content-Type: application/json" -d '{"compatibility": "BACKWARD_
 
 ```
 
-## TODO
+### TODO
 
 - [ ] DELETE endpoints
 
-## Reference
+### Reference
 
 - [Confluent API](https://docs.confluent.io/platform/current/schema-registry/develop/api.html)
