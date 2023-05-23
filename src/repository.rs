@@ -80,13 +80,13 @@ impl Repository for PgRepository {
     }
 
     async fn schema_find_by_version(&self, subject: &String, version: i32) -> Result<Option<FindBySchemaResponse>, Error> {
-        sqlx::query_as!(FindBySchemaResponse, r#"select sub.name as name, sv.version as version, sch.id as id, sch.json as schema from schemas sch inner join schema_versions sv on sch.id = sv.schema_id inner join subjects sub on sv.subject_id = sub.id where sch.deleted_at is null and sv.version = $1 and sub.name = $2;"#, version, subject)
+        sqlx::query_as!(FindBySchemaResponse, r#"select sub.name as name, sv.version as version, sch.id as id, sch.json as schema from schemas sch inner join schema_versions sv on sch.id = sv.schema_id inner join subjects sub on sv.subject_id = sub.id where sub.deleted_at is null and sch.deleted_at is null and sv.version = $1 and sub.name = $2;"#, version, subject)
             .fetch_optional(&self.pool)
             .await
     }
 
     async fn schema_find_by_schema(&self, subject: &String, fingerprint: &String) -> Result<Option<FindBySchemaResponse>, Error> {
-        sqlx::query_as!(FindBySchemaResponse, r#"select sub.name as name, sv.version as version, sch.id as id, sch.json as schema from schemas sch inner join schema_versions sv on sch.id = sv.schema_id inner join subjects sub on sv.subject_id = sub.id where sch.deleted_at is null and sch.fingerprint = $1 and sub.name = $2;"#, fingerprint, subject)
+        sqlx::query_as!(FindBySchemaResponse, r#"select sub.name as name, sv.version as version, sch.id as id, sch.json as schema from schemas sch inner join schema_versions sv on sch.id = sv.schema_id inner join subjects sub on sv.subject_id = sub.id where sub.deleted_at is null and sch.deleted_at is null and sch.fingerprint = $1 and sub.name = $2;"#, fingerprint, subject)
             .fetch_optional(&self.pool)
             .await
     }
@@ -117,7 +117,7 @@ impl Repository for PgRepository {
     }
 
     async fn subject_versions(&self, subject: &String) -> Result<Vec<i32>, Error> {
-        let res = sqlx::query!(r#"SELECT version FROM subjects s INNER JOIN schema_versions sv ON s.id = sv.subject_id WHERE s.name = $1;"#, subject)
+        let res = sqlx::query!(r#"SELECT version FROM subjects s INNER JOIN schema_versions sv ON s.id = sv.subject_id WHERE s.deleted_at is null and s.name = $1;"#, subject)
             .fetch_all(&self.pool)
             .await?;
 
@@ -126,15 +126,15 @@ impl Repository for PgRepository {
     }
 
     async fn subject_find(&self, subject: &String) -> Result<Option<Subject>, Error> {
-        sqlx::query_as!(Subject, r#"SELECT id, name FROM subjects WHERE name = $1"#, subject).fetch_optional(&self.pool).await
+        sqlx::query_as!(Subject, r#"SELECT id, name FROM subjects WHERE deleted_at is null and name = $1"#, subject).fetch_optional(&self.pool).await
     }
 
     async fn subject_all(&self) -> Result<Vec<Subject>, Error> {
-        sqlx::query_as!(Subject, r#"SELECT id, name FROM subjects"#).fetch_all(&self.pool).await
+        sqlx::query_as!(Subject, r#"SELECT id, name FROM subjects WHERE deleted_at is null"#).fetch_all(&self.pool).await
     }
 
     async fn subject_schemas(&self, subject: &String) -> Result<Vec<VersionedSchema>, Error> {
-        sqlx::query_as!(VersionedSchema, r#"select sv.version as version, sch.id as id, sch.json as schema from schemas sch inner join schema_versions sv on sch.id = sv.schema_id inner join subjects sub on sv.subject_id = sub.id where sch.deleted_at is null and sub.name = $1 order by sv.version desc;"#, subject)
+        sqlx::query_as!(VersionedSchema, r#"select sv.version as version, sch.id as id, sch.json as schema from schemas sch inner join schema_versions sv on sch.id = sv.schema_id inner join subjects sub on sv.subject_id = sub.id where sub.deleted_at is null and sch.deleted_at is null and sub.name = $1 order by sv.version desc;"#, subject)
             .fetch_all(&self.pool)
             .await
     }
