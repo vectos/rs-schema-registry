@@ -42,4 +42,5 @@ curl -X PUT -H "Content-Type: application/json" -d '{"compatibility": "BACKWARD_
 
 ### Reference
 
+- [Docker hub](https://hub.docker.com/r/markdj/rs-schema-registry/tags)
 - [Confluent API](https://docs.confluent.io/platform/current/schema-registry/develop/api.html)
