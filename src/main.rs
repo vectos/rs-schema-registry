@@ -27,10 +27,10 @@ async fn main() {
         .await
         .unwrap();
     
-    let repository: PgRepository = PgRepository { pool };
+    let repository: PgRepository = PgRepository { pool: pool.clone() };
     let service: Service<PgRepository> = Service { repository };
 
-    // sqlx::migrate!().run(pool.clone()).await.unwrap();
+    sqlx::migrate!().run(&pool).await.unwrap();
 
     let app = Router::new()
         .route("/subjects", get(list_subjects))
