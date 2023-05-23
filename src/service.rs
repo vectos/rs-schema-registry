@@ -29,8 +29,8 @@ impl <R : Repository + Send + Sync> Service<R> {
 
         let affected: Result<u64, AppError> = match res {
             Some(resp) => {
-                let res= self.repository.schema_sof_delete(resp.id).await?;
-                Ok(res)
+                let affected = self.repository.schema_soft_delete(resp.id).await?;
+                Ok(affected)
             },
             None => Ok(0)
         };

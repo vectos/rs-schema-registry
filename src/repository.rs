@@ -6,7 +6,7 @@ use crate::data::*;
 #[async_trait]
 pub trait Repository {
     async fn schema_find_by_id(&self, id: i64) -> Result<Option<SchemaPayload>, Error>;
-    async fn schema_sof_delete(&self, schema_id: i64) -> Result<u64, Error>;
+    async fn schema_soft_delete(&self, schema_id: i64) -> Result<u64, Error>;
     async fn schema_find_by_version(&self, subject: &String, version: i32) -> Result<Option<FindBySchemaResponse>, Error>;
     async fn schema_find_by_schema(&self, subject: &String, fingerprint: &String) -> Result<Option<FindBySchemaResponse>, Error>;
     async fn insert(&self, fingerprint: &String, schema: &String, subject_id: i64, max_version: i32) -> Result<i64, Error>;
@@ -35,13 +35,23 @@ impl Repository for PgRepository {
         Ok(res)
     }
 
-    async fn schema_sof_delete(&self, schema_id: i64) -> Result<u64, Error> {
-        let res = sqlx::query!(r#"UPDATE schemas SET deleted_at = now() WHERE id = $1"#, schema_id)
+    async fn schema_soft_delete(&self, schema_id: i64) -> Result<u64, Error> {
+
+        let tx = self.pool.begin().await?;
+
+        let affected = sqlx::query!(r#"UPDATE schemas SET deleted_at = now() WHERE id = $1"#, schema_id)
             .execute(&self.pool)
             .await?
             .rows_affected();
 
-        Ok(res)
+        let _ = sqlx::query!(r#"DELETE FROM schema_versions WHERE schema_id = $1"#, schema_id)
+            .execute(&self.pool)
+            .await?
+            .rows_affected();
+
+        tx.commit().await?;
+
+        Ok(affected)
     }
 
     async fn schema_find_by_version(&self, subject: &String, version: i32) -> Result<Option<FindBySchemaResponse>, Error> {

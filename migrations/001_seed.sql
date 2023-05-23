@@ -23,8 +23,8 @@ CREATE SEQUENCE schema_versions_id_seq;
 CREATE TABLE schema_versions (
   id BIGINT PRIMARY KEY DEFAULT nextval('schema_versions_id_seq'::regclass),
   version INTEGER DEFAULT 1 NOT NULL,
-  subject_id BIGINT NOT NULL references subjects(id),
-  schema_id BIGINT NOT NULL references schemas(id)
+  subject_id BIGINT NOT NULL references subjects(id) on delete cascade,
+  schema_id BIGINT NOT NULL references schemas(id) on delete cascade
 );
 
 CREATE UNIQUE INDEX index_schema_versions_on_subject_id_and_version ON schema_versions(subject_id, version);
@@ -35,7 +35,7 @@ CREATE TABLE configs (
   compatibility CHARACTER VARYING,
   created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL,
   updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL,
-  subject_id BIGINT references subjects(id)
+  subject_id BIGINT references subjects(id) on delete cascade
 );
 
 CREATE UNIQUE INDEX index_configs_on_subject_id ON configs(subject_id);
